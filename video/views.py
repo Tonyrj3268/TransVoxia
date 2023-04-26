@@ -13,7 +13,7 @@ def video_url_input(request):
         return render(request, 'core\input.html')
     
 def process_video_url(url):
-    # _,video_length = generate_transcript_from_url(url)
-    new_video = Video.objects.create(url=url,length=0)
-    transcript = Transcript.objects.create(video=new_video, language='zh-TW', transcript='這是一個示例翻譯。')
+    trans_text,video_length = generate_transcript_from_url(url)
+    new_video = Video.objects.create(url=url,length=video_length)
+    transcript = Transcript.objects.create(video=new_video, language='zh-TW', transcript=trans_text)
     return True

@@ -4,6 +4,6 @@ from . import views
 app_name = 'video'
 
 urlpatterns = [
-    path('transcript', views.generate_transcript),
+    path('video_url_input/', views.video_url_input, name='video_url_input'),
     # ... 其他 URL 路由規則 ...
 ]

@@ -4,6 +4,6 @@ from . import views
 app_name = 'core'
 
 urlpatterns = [
-    path('', views.input, name='input'),
+    path('', views.index, name='index'),
     # ... 其他 URL 路由規則 ...
 ]

@@ -1,40 +1,19 @@
 from django.shortcuts import render
-import JsonResponse
-from yt_dlp import YoutubeDL
-import whisper
-import os
-from mutagen.mp4 import MP4
+from .models import Video, Transcript
+from .utils import generate_transcript_from_url
+
 # Create your views here.
-def generate_transcript(request):
+def video_url_input(request):
     if request.method == 'POST':
-        url = request.POST.get('url')
-        # Use a library or API to generate transcript from the video URL
-        transcript,video_length = generate_transcript_from_url(url)
-        print(transcript)
-        return JsonResponse({'transcript': transcript})
+        url = request.POST.get('video_url')
+        result = process_video_url(url)
+        # 處理用戶輸入的URL，例如儲存到資料庫或者進行下一步操作
+        return render(request, 'core\success.html')
     else:
-        return JsonResponse({'error': 'Invalid request method'})
+        return render(request, 'core\input.html')
     
-def download_youtube(url):
-    ydl_opts = {}
-    ydl_opts["format"] = "m4a"
-    ydl_opts["outtmpl"] = "video-temp/"+"%(id)s.%(ext)s"
-
-    with YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
-
-def generate_transcript_from_url(url = "https://www.youtube.com/watch?v=FpiWSFcL3-c"):
-    location = "/content/"+url.split("watch?v=")[1].split("&")[0]+".m4a"
-    if not os.path.isfile(location):
-        download_youtube(url)
-    model = whisper.load_model("small")
-    result_m4a = model.transcribe(location)
-    origin = result_m4a["text"]
-    length = get_audio_len(location)
-    return origin, length
-
-def get_audio_len(file_name):
-    audio = MP4(file_name)
-    length = audio.info.length
-    print("Total length:", length)
-    return length
+def process_video_url(url):
+    # _,video_length = generate_transcript_from_url(url)
+    new_video = Video.objects.create(url=url,length=0)
+    transcript = Transcript.objects.create(video=new_video, language='zh-TW', transcript='這是一個示例翻譯。')
+    return True

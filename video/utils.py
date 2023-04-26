@@ -11,7 +11,7 @@ def download_youtube(url):
         ydl.download([url])
 
 def generate_transcript_from_url(url):
-    location = "../tem-video/"+url.split("watch?v=")[1].split("&")[0]+".m4a"
+    location = "video-temp/"+url.split("watch?v=")[1].split("&")[0]+".m4a"
     if not os.path.isfile(location):
         download_youtube(url)
     model = whisper.load_model("small")
@@ -23,5 +23,4 @@ def generate_transcript_from_url(url):
 def get_audio_len(file_name):
     audio = MP4(file_name)
     length = audio.info.length
-    print("Total length:", length)
     return length

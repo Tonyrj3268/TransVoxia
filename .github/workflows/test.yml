@@ -11,11 +11,18 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-      - name: Install ffmpeg
+      - name: Download FFmpeg source code
+        run: git clone https://git.ffmpeg.org/ffmpeg.git
+      - name: Build and install FFmpeg
         run: |
           sudo apt-get update
-          sudo apt-get install ffmpeg -y
-          echo "export PATH=$PATH:/usr/bin/ffmpeg" >> $GITHUB_ENV
+          sudo apt-get install -y build-essential git-core checkinstall yasm texi2html \
+              libvorbis-dev libx11-dev libvpx-dev libx264-dev libtheora-dev \
+              libmp3lame-dev libopus-dev libx265-dev libass-dev libwebp-dev
+          cd ffmpeg
+          ./configure --enable-shared --disable-static
+          make -j$(nproc)
+          sudo make install
       - name: Install dependencies
         run: pip install -r requirements.txt
 

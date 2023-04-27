@@ -11,17 +11,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-      - name: Download FFmpeg source code
-        run: git clone https://git.ffmpeg.org/ffmpeg.git
-
-      - name: Build and install FFmpeg
-        run: sudo apt-get install FFmpeg
-
       - name: Install dependencies
         run: pip install -r requirements.txt
-      - name: Install dependencies
-        run: pip install ffmpeg
-
       - name: Run tests
         run: python manage.py test
   test-video_trans:

@@ -17,9 +17,27 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+    on:
+  push:
+    branches:
+      - main
+      - video_trans
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.8'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
     - name: Run tests on main branch
         if: github.ref == 'refs/heads/main'
         run: python manage.py test
-     - name: Run tests on develop branch
-        if: github.ref == 'refs/heads/video_trans'
-        run: python manage.py test video.tests
+    - name: Run tests on develop branch
+      if: github.ref == 'refs/heads/video_trans'
+      run: python manage.py test video.tests

@@ -2,3 +2,4 @@ openai-whisper
 yt_dlp
 django==4.2
 mutagen==1.46.0
+ffmpeg==1.4

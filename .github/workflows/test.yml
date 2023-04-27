@@ -15,15 +15,12 @@ jobs:
         run: git clone https://git.ffmpeg.org/ffmpeg.git
 
       - name: Build and install FFmpeg
-        run: |
-          sudo apt-get update
-          sudo apt-get install FFmpeg
-          
-      - name: Set environment variable for ffmpeg
-        run: echo "export PATH=$PATH:/usr/local/bin/ffmpeg" >> $GITHUB_ENV
+        run: sudo apt-get install FFmpeg
 
       - name: Install dependencies
         run: pip install -r requirements.txt
+      - name: Install dependencies
+        run: pip install ffmpeg
 
       - name: Run tests
         run: python manage.py test

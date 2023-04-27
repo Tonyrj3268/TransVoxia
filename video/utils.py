@@ -4,10 +4,8 @@ import os
 from mutagen.mp4 import MP4
 def download_youtube(url):
     ydl_opts = {}
-    # ydl_opts["format"] = "m4a"
-    # ydl_opts["outtmpl"] = "video-temp/"+"%(id)s.%(ext)s"
-    ydl_opts["format"] = "'bestvideo+bestaudio[ext=m4a]/best[ext=mp4]/best'"
-    ydl_opts["outtmpl"] = "video-temp/" + "%(id)s.%(ext)s"
+    ydl_opts["format"] = "m4a"
+    ydl_opts["outtmpl"] = "video-temp/"+"%(id)s.%(ext)s"
 
     with YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])

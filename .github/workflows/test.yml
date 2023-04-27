@@ -23,6 +23,16 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: FFmpeg
+        run: |
+          pip3 uninstall ffmpeg
+          pip3 uninstall ffmpeg-python
+          pip uninstall ffmpeg
+          pip uninstall ffmpeg-python
+          brew uninstall ffmpeg
+          pip3 install ffmpeg-python
+          brew install ffmpeg
+
       - name: Run tests
         run: python manage.py test
   test-video_trans:

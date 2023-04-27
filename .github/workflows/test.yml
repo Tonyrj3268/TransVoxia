@@ -11,10 +11,18 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-      - name: Install ffmpeg
-        run: sudo apt-get install ffmpeg
+
+      - name: Build and install FFmpeg
+        run: |
+          wget https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz
+          tar xf ffmpeg-master-latest-linux64-gpl.tar.xz -C /opt
+          
+      - name: Set environment variable for ffmpeg
+        run: echo "export PATH=$PATH:/opt/ffmpeg-master-latest-linux64-gpl/bin" >> $GITHUB_ENV
+
       - name: Install dependencies
         run: pip install -r requirements.txt
+
       - name: Run tests
         run: python manage.py test
   test-video_trans:

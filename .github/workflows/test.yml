@@ -1,7 +1,9 @@
 name: Test
 on:
   push:
-    branches: [ video_tran ]
+    branches:
+      - main
+      - video
 jobs:
   test-main:
     if: github.ref == 'refs/heads/main'

@@ -3,7 +3,7 @@ on:
   push:
     branches:
       - main
-      - video
+      - video_trans
 jobs:
   test-main:
     if: github.ref == 'refs/heads/main'
@@ -17,8 +17,8 @@ jobs:
 
       - name: Run tests
         run: python manage.py test
-  test-video:
-    if: github.ref == 'refs/heads/video'
+  test-video_trans:
+    if: github.ref == 'refs/heads/video_trans'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code

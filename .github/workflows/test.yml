@@ -33,6 +33,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
+      - name: Build and install FFmpeg
+        run: |
+          sudo apt update
+          sudo apt install ffmpeg
+      - name: Set environment variable for ffmpeg
+        run: echo "export PATH=/usr/bin/ffmpeg:$PATH" >> $GITHUB_ENV
+      - name: Check ffmpeg version
+        run: ffmpeg -version
+        
       - name: Install dependencies
         run: pip install -r requirements.txt
 

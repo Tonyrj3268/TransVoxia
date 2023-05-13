@@ -1,53 +1,65 @@
-import unittest
-from django.test import TestCase, Client
+from unittest.mock import patch
+from django.test import TestCase
 from django.urls import reverse
-from .models import Video, Transcript
+from .models import *
 from .utils import *
-from .views import *
+from core.models import *
+import datetime
 
-class VideoTestCase(TestCase):
-    
+
+class TestDownloadYoutube(TestCase):
+    @patch("video.utils.YoutubeDL")
+    def test_download_youtube(self, mock_youtubeDL):
+        download_youtube("https://www.youtube.com/watch?v=CmwSf7rI2II")
+        mock_youtubeDL.assert_called_once()
+
+
+class TestGenerateTranscript(TestCase):
+    @patch("video.utils.whisper")
+    @patch("video.utils.os")
+    @patch("video.utils.download_youtube")
+    @patch("video.utils.MP4")
+    def test_generate_transcript_from_url(
+        self, mock_mp4, mock_download_youtube, mock_os, mock_whisper
+    ):
+        mock_os.path.isfile.return_value = True
+        mock_whisper.load_model.return_value.transcribe.return_value = {
+            "text": "Sample transcript"
+        }
+        mock_mp4.return_value.info.length = 10.1
+        user = User.objects.create(
+            email="test@example.com",
+            password="test",
+            expiration_date=datetime.date.today(),
+        )
+        task = Task.objects.create(
+            userID=user,
+            url="https://www.youtube.com/watch?v=CmwSf7rI2II",
+            status="0",
+            mode="transcript",
+        )
+        transcript = generate_transcript_from_url(task)
+
+        self.assertEqual(transcript, "Sample transcript")
+
+
+class TestProcessVideoIntegration(TestCase):
     def setUp(self):
-        self.url = 'https://www.youtube.com/watch?v=CmwSf7rI2II'
-        self.language = 'zh-TW'
-        self.path =  "video-temp/"+self.url.split("watch?v=")[1].split("&")[0]+".m4a"
-        self.transcript = "Whatever you are into, San Jacinto College is into your success. Learn more at SanJack.edu."
-        self.length = 10
-    def tearDown(self):
-        # 刪除檔案
-        if os.path.exists(self.path):
-            os.remove(self.path)
+        self.user = User.objects.create(
+            email="test@example.com",
+            password="test",
+            expiration_date=datetime.date.today(),
+        )
+        self.task = Task.objects.create(
+            userID=self.user,
+            url="https://www.youtube.com/watch?v=CmwSf7rI2II",
+            status="0",
+            mode="transcript",
+        )
 
-    #測試是否下載成功
-    def test_download_youtube(self):
-        download_youtube(self.url)
-        self.assertIsNotNone(self.path)
-        self.assertTrue(os.path.exists(self.path))
-        self.assertGreater(os.path.getsize(self.path), 0)
-    #測試是否文字稿成功生成、影片長度生成
-    def test_convert_to_text(self):
-        text, length = generate_transcript_from_url(self.url)
-        self.assertIsNotNone(text)
-        self.assertIsInstance(text, str)
-        self.assertGreater(len(text), len(self.transcript)-10)
-        self.assertGreater(length,0)
-    #測試是否文字稿、影片長度成功儲存
-    def test_store_video_info(self):
-        store_video_info(self.url,self.transcript,self.length)
-        saved_video = Video.objects.get(url=self.url)
-        saved_transcript = Transcript.objects.get(video=saved_video)
-        self.assertEqual(saved_video.length, self.length)
-        self.assertEqual(saved_transcript.transcript, self.transcript)
-    
-    def test_whole_process(self):
-        c = Client()
-        response = c.post(reverse('video:video_url_input'), {'video_url': self.url})
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.content.decode(), 'Success')
-        saved_video = Video.objects.get(url=self.url)
-        saved_transcript = Transcript.objects.get(video=saved_video)
-        self.assertIsNotNone(saved_video.length)
-        self.assertIsNotNone(saved_video.upload_time)
-        self.assertTrue(os.path.exists(self.path))
-        self.assertEqual(saved_video.length, self.length)
-        self.assertGreater(len(saved_transcript.transcript), len(self.transcript)-10)
+    def test_process_video(self):
+        process_video(self.task)
+
+        self.assertEqual(self.task.status, "1")
+        self.assertTrue(Video.objects.filter(taskID=self.task).exists())
+        self.assertTrue(Transcript.objects.filter(taskID=self.task).exists())

@@ -21,5 +21,5 @@ urlpatterns = [
     path('', RedirectView.as_view(url='core/')),
     path('admin/', admin.site.urls),
     path('core/', include('core.urls')),
-    path('video/', include('video.urls')),
+    
 ]

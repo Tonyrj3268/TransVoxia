@@ -1,8 +1,19 @@
-<form method="POST" action="{% url 'video:video_url_input' %}">
-  {% csrf_token %}
-  <label for="video_url">Video URL:</label>
-  <input type="text" id="video_url" name="video_url">
-  <br>
-  <button type="submit">Submit</button>
-</form>
-  
+{% load static %}
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>My Page</title>
+  </head>
+  <body>
+    <form method="POST" action="{% url 'core:create_task' %}">
+      {% csrf_token %}
+      <label for="video_url">Video URL:</label>
+      <input type="text" id="video_url" name="video_url">
+      <br>
+      <button type="submit">Submit</button>
+    </form>
+    <p id="message"></p>
+
+    <script src="{% static 'js/index.js' %}"></script>
+  </body>
+</html>

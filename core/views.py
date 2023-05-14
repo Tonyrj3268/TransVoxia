@@ -48,29 +48,3 @@ def process_task(task):
     process_video(task)
     process_deepl(task)
     process_audio(task)
-
-
-"""
-async def create_task(request):
-    # 從請求中獲取URL
-    url = request.POST.get('video_url')
-    
-    # 將URL記錄到資料庫
-    # 狀態設置為未完成
-    try:
-        user = User.objects.get(email="default@example.com")
-        task = {'userID':user, 'url':url, 'target_language':'zh-TW', 'voice_selection':'', 'mode':'逐字稿', 'status':'Status 0'}
-        video = {'file_location' : url,}
-        async with transaction.atomic():
-            task_obj = Task.objects.create(**task)
-            video['taskID'] = task_obj
-            Video.objects.create(**video)
-        # 啟動一個非同步任務處理視頻
-        asyncio.create_task(process_video())
-
-        # 創建任務成功，返回成功的響應
-        return JsonResponse({'status': 'success'})
-    except Exception as e:
-        # 創建任務失敗，返回錯誤的響應
-        return JsonResponse({'status': 'error', 'message': str(e)})
-"""

@@ -5,6 +5,7 @@ from core.models import Task
 from translator.models import Deepl
 from video.models import Video
 from .models import Play_ht
+import os
 
 
 def process_audio(task: Task):
@@ -36,11 +37,7 @@ def make_voice(text, voice, speed):
             "globalSpeed": str(speed) + "%",
         }
     )
-    headers = {
-        "Authorization": "27c66ac7aaf047449156d3494bcd04bf",
-        "X-User-ID": "i7IAFc6EA2NJO6mgo6X3S5qwGso1",
-        "Content-Type": "application/json",
-    }
+    headers = json.loads(os.getenv("PLAY_HT_API_KEY"))
     response = requests.request(
         "POST", "https://play.ht/api/v1/convert", headers=headers, data=payload
     )
@@ -59,11 +56,7 @@ def make_voice(text, voice, speed):
 
 
 def check_voice_make(url):
-    headers = {
-        "Authorization": "27c66ac7aaf047449156d3494bcd04bf",
-        "X-User-ID": "i7IAFc6EA2NJO6mgo6X3S5qwGso1",
-        "Content-Type": "application/json",
-    }
+    headers = json.loads(os.getenv("PLAY_HT_API_KEY"))
     response = requests.request("GET", url, headers=headers)
     dict_data = json.loads(
         response.text,

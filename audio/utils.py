@@ -6,6 +6,8 @@ from translator.models import Deepl
 from video.models import Video
 from .models import Play_ht
 import os
+from pydub import AudioSegment
+from pydub.utils import mediainfo
 
 
 def process_audio(task: Task):
@@ -13,17 +15,37 @@ def process_audio(task: Task):
     voice = task.voice_selection
     origin_length = Video.objects.get(taskID=task).length
 
-    url, dic = make_voice(text, voice, speed=100)
-    length_ratio = round(dic["audioDuration"] / float(origin_length), 2)
-    url_new, dic_new = make_voice(text, voice, speed=int(length_ratio * 100))
+    text_chunks = split_text_into_chunks(text, chunk_size=2500)
 
+    audio_file_paths = []
+    for i, text_chunk in enumerate(text_chunks):
+        url, dic = make_voice(text_chunk, voice)
+
+        # 下載音訊檔案並儲存到本地，然後將路徑添加到列表中
+        audio_file_path = f"{task.taskID}_audio_{i}.mp3"
+        download_audio(url, audio_file_path)
+        audio_file_paths.append(audio_file_path)
+
+    # 將所有音訊檔案合併為一個完整的音訊檔案
+    combined_audio_path = f"{task.taskID}_complete_audio.mp3"
+    combine_audio_files(audio_file_paths, combined_audio_path)
+    length_ratio = round(
+        get_audio_length(combined_audio_path) / float(origin_length), 2
+    )
+
+    fast_sound = speed_change(
+        AudioSegment.from_file(combined_audio_path, format="mp3"), length_ratio
+    )
+    combined_audio_new_path = f"{task.taskID}_complete_audio_new.mp3"
+    fast_sound.export(combined_audio_new_path, format="mp3")
     Play_ht.objects.create(
         taskID=task,
         origin_audio_url=url,
-        changed_audi_url=url_new,
+        changed_audi_url=combined_audio_new_path,
         length_ratio=length_ratio,
         status=True,
     )
+
     task.status = "3"
     task.save()
 
@@ -70,3 +92,49 @@ def check_voice_make(url):
         return True
     else:
         return dict_data
+
+
+def download_audio(url, path):
+    with requests.get(url, stream=True) as r:
+        r.raise_for_status()
+        with open(path, "wb") as f:
+            for chunk in r.iter_content(chunk_size=8192):
+                f.write(chunk)
+
+
+def combine_audio_files(audio_file_paths, output_path):
+    combined = AudioSegment.empty()
+
+    for path in audio_file_paths:
+        audio = AudioSegment.from_mp3(path)
+        combined += audio
+
+    combined.export(output_path, format="mp3")
+
+
+def split_text_into_chunks(text, chunk_size):
+    # 將文本分成指定大小的塊
+    chunks = []
+    while text:
+        chunks.append(text[:chunk_size])
+        text = text[chunk_size:]
+    return chunks
+
+
+def get_audio_length(audio_path):
+    info = mediainfo(audio_path)
+    audio_length = int(info["duration"])
+    return audio_length
+
+
+def speed_change(sound, speed=1.0):
+    # Manually override the frame_rate. This tells the computer how many
+    # samples to play per second
+    sound_with_altered_frame_rate = sound._spawn(
+        sound.raw_data, overrides={"frame_rate": int(sound.frame_rate * speed)}
+    )
+
+    # convert the sound with altered frame rate to a standard frame rate
+    # so that regular playback programs will work right. They often only
+    # know how to play audio at standard frame rate
+    return sound_with_altered_frame_rate.set_frame_rate(sound.frame_rate)

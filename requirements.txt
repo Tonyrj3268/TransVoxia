@@ -6,3 +6,4 @@ deepl
 python-dotenv
 openai
 pydub
+djangorestframework

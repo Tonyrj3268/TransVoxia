@@ -4,3 +4,5 @@ django==4.2.1
 mutagen==1.46.0
 deepl
 python-dotenv
+openai
+pydub

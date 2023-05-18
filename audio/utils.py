@@ -19,29 +19,30 @@ def process_audio(task: Task):
 
     audio_file_paths = []
     for i, text_chunk in enumerate(text_chunks):
-        url, dic = make_voice(text_chunk, voice)
+        dic = make_voice(text_chunk, voice, 100)
+        url = dic["audioUrl"]
 
         # 下載音訊檔案並儲存到本地，然後將路徑添加到列表中
-        audio_file_path = f"{task.taskID}_audio_{i}.mp3"
+        audio_file_path = f"video-temp/{task.taskID}_audio_{i}.mp3"
         download_audio(url, audio_file_path)
         audio_file_paths.append(audio_file_path)
 
     # 將所有音訊檔案合併為一個完整的音訊檔案
-    combined_audio_path = f"{task.taskID}_complete_audio.mp3"
+    combined_audio_path = f"video-temp/{task.taskID}_complete_audio.mp3"
     combine_audio_files(audio_file_paths, combined_audio_path)
     length_ratio = round(
-        get_audio_length(combined_audio_path) / float(origin_length), 2
+        get_audio_length(combined_audio_path) / float(origin_length), 3
     )
 
     fast_sound = speed_change(
         AudioSegment.from_file(combined_audio_path, format="mp3"), length_ratio
     )
-    combined_audio_new_path = f"{task.taskID}_complete_audio_new.mp3"
+    combined_audio_new_path = f"video-temp/{task.taskID}_complete_audio_new.mp3"
     fast_sound.export(combined_audio_new_path, format="mp3")
     Play_ht.objects.create(
         taskID=task,
         origin_audio_url=url,
-        changed_audi_url=combined_audio_new_path,
+        changed_audio_url=combined_audio_new_path,
         length_ratio=length_ratio,
         status=True,
     )
@@ -63,18 +64,18 @@ def make_voice(text, voice, speed):
     response = requests.request(
         "POST", "https://play.ht/api/v1/convert", headers=headers, data=payload
     )
+    print(response.json())
     id = response.json()["transcriptionId"]
     url = "https://play.ht/api/v1/articleStatus?transcriptionId=" + id
-    print("----------生成聲音中----------" if speed == 1 else "----------加速聲音中----------")
+    print("----------生成聲音中----------")
 
-    response = requests.request("GET", url, headers=headers)
     i = 0
     while (dic := check_voice_make(url)) == True:
         i += 1
         if i > 12:
             print("請求超時")
             break
-    return url, dic
+    return dic
 
 
 def check_voice_make(url):
@@ -86,6 +87,7 @@ def check_voice_make(url):
             k: True if v == "true" else False if v == "false" else v for k, v in x
         },
     )
+    print(dict_data)
     if dict_data["message"] == "Transcription still in progress":
         print("請稍等")
         time.sleep(10)
@@ -123,8 +125,8 @@ def split_text_into_chunks(text, chunk_size):
 
 def get_audio_length(audio_path):
     info = mediainfo(audio_path)
-    audio_length = int(info["duration"])
-    return audio_length
+    print(float(info["duration"]))
+    return float(info["duration"])
 
 
 def speed_change(sound, speed=1.0):

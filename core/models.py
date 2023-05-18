@@ -16,6 +16,7 @@ class User(models.Model):
 class Task(models.Model):
     taskID = models.AutoField(primary_key=True)
     userID = models.ForeignKey(User, on_delete=models.CASCADE)
+    title = models.CharField(max_length=255)
     url = models.URLField(max_length=255)
     # file = models.FileField(upload_to='uploads/')
     request_time = models.DateTimeField(auto_now_add=True)
@@ -39,3 +40,4 @@ class Task(models.Model):
         (None, "N/A"),
     ]
     status = models.CharField(choices=STATUS_CHOICES, max_length=50)
+    edit_mode = models.BooleanField(default=False)

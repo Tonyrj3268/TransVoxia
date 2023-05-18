@@ -9,7 +9,7 @@ class Play_ht_Info_Admin(admin.ModelAdmin):
         "taskID",
         "length_ratio",
         "origin_audio_url",
-        "changed_audi_url",
+        "changed_audio_url",
         "status",
     )
 

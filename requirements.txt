@@ -7,3 +7,4 @@ python-dotenv
 openai
 pydub
 djangorestframework
+django-rest-swagger

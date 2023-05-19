@@ -62,9 +62,9 @@ class TaskListAPIView(APIView):
                 task.file = filename  # 將文件路徑保存到數據庫字段中
 
             task.save()
-            # future = executor.submit(process_task, task)
-            # task_futures[task.taskID] = future
-            return Response(status=status.HTTP_200_OK)
+            future = executor.submit(process_task, task)
+            task_futures[task.taskID] = future
+            return Response({"msg": "已收到"}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response(
                 {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -119,6 +119,7 @@ def create_task(request):
 
 
 def process_task(task):
+    print(f"開始處理任務：{task.taskID}")
     process_video(task)
     process_deepl(task)
     process_audio(task)

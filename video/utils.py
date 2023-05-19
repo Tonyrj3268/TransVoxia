@@ -12,7 +12,7 @@ import openai
 def process_video(task: Task):
     if task:
         # 如果有未處理的URL，進行處理
-        trans_text = generate_transcript_from_chatgpt(task)
+        trans_text = generate_transcript_from_file(task)
         store_transcript_info(task, trans_text)
         # 設置URL已處理
         task.status = "1"
@@ -50,6 +50,18 @@ def generate_transcript_from_chatgpt(task: Task):
     location = "video-temp/" + url.split("watch?v=")[1].split("&")[0] + ".m4a"
     if not os.path.isfile(location):
         download_youtube(url)
+    openai.api_key = os.getenv("OPENAI_API_KEY")
+    audio_file = open(location, "rb")
+    transcript = openai.Audio.transcribe("whisper-1", audio_file)
+    length = get_audio_len(location)
+    print(transcript)
+    print("----------文字稿已生成----------")
+    store_video_info(task, location, length)
+    return transcript["text"]
+
+
+def generate_transcript_from_file(task: Task):
+    location = str(task.file)
     openai.api_key = os.getenv("OPENAI_API_KEY")
     audio_file = open(location, "rb")
     transcript = openai.Audio.transcribe("whisper-1", audio_file)

@@ -1,24 +1,23 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.core.files.storage import default_storage
-from django.http import Http404
-
-# from social_django.utils import psa
+from django.http import Http404, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from django.http import JsonResponse
-from .models import Task, User
-from video.utils import process_video
-from .forms import TaskForm
-from django.shortcuts import render, redirect
-import threading
-from video.utils import process_video
-from translator.utils import process_deepl
-from audio.utils import process_audio
-from .serializers import TaskSerializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from concurrent.futures import ThreadPoolExecutor
-from django.shortcuts import get_object_or_404
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
+
+from .models import Task, User
+from .forms import TaskForm
+from .serializers import TaskSerializer
+from video.models import Transcript
+from video.utils import process_video
+from audio.utils import process_audio
+from translator.utils import process_deepl
+
+import threading
 
 
 # Create your views here.
@@ -35,6 +34,21 @@ task_futures = {}
 
 
 class TaskListAPIView(APIView):
+    @swagger_auto_schema(
+        operation_description="Get a list of tasks for a specific user.",
+        responses={
+            200: "OK",
+            404: "User does not exist",
+        },
+        manual_parameters=[
+            openapi.Parameter(
+                "email",
+                openapi.IN_QUERY,
+                description="User's email",
+                type=openapi.TYPE_STRING,
+            ),
+        ],
+    )
     def get(self, request):
         email = request.GET.get("email")
         try:
@@ -45,6 +59,45 @@ class TaskListAPIView(APIView):
         except User.DoesNotExist:
             raise Http404("User does not exist")
 
+    @swagger_auto_schema(
+        operation_description="Create a new task for a specific user.",
+        responses={
+            200: "Task created successfully",
+            500: "Internal Server Error",
+        },
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                "email": openapi.Schema(
+                    type=openapi.TYPE_STRING, description="User email"
+                ),
+                "target_language": openapi.Schema(
+                    type=openapi.TYPE_STRING, description="Target Language"
+                ),
+                "voice_selection": openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Voice Selection",
+                    enum=["ko-KR-Standard-A", "larry", "zh-TW-YunJheNeural"],
+                ),
+                "mode": openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Final Output Mode",
+                    enum=["transcript", "audio", "video"],
+                ),
+                "title": openapi.Schema(
+                    type=openapi.TYPE_STRING, description="Task Title"
+                ),
+                "editmode": openapi.Schema(
+                    type=openapi.TYPE_BOOLEAN,
+                    description="True means the transcript is editable, False means not editable",
+                ),
+                "file": openapi.Schema(
+                    type=openapi.TYPE_FILE,
+                    description="Upload file, for video and audio only",
+                ),
+            },
+        ),
+    )
     def post(self, request):
         try:
             email = request.data.get("email")
@@ -71,16 +124,89 @@ class TaskListAPIView(APIView):
             )
 
 
+class ChangeTaskAPIView(APIView):
+    @swagger_auto_schema(
+        operation_description="Change a task for a specific user.",
+        responses={
+            200: "Task changed successfully",
+            404: "Task not found",
+            400: "Invalid field",
+        },
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                "taskID": openapi.Schema(
+                    type=openapi.TYPE_STRING, description="Task ID"
+                ),
+                "field": openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Field to change. Acceptable fields: title, transcript.",
+                    enum=["title", "transcript"],
+                ),
+                "email": openapi.Schema(
+                    type=openapi.TYPE_STRING, description="User email"
+                ),
+                "new_value": openapi.Schema(
+                    type=openapi.TYPE_STRING, description="New value for the field"
+                ),
+            },
+        ),
+    )
+    def post(self, request):
+        taskID = request.data.get("taskID")
+        field = request.data.get("field")
+        email = request.data.get("email")
+        new_value = request.data.get("new_value")
+
+        user = get_object_or_404(User, email=email)
+
+        try:
+            task = Task.objects.get(taskID=taskID)
+        except Task.DoesNotExist:
+            return Response({"error": "Task not found."}, status=404)
+
+        if user == task.userID:
+            if field == "title":
+                task.title = new_value
+                task.save()
+            elif field == "transcript":
+                tran = get_object_or_404(Transcript, taskID=task)
+                tran.transcript = new_value
+                tran.save()
+            else:
+                return Response({"error": "Invalid field."}, status=400)
+
+        return Response({"已修改": field}, status=200)
+
+
 class StopTaskAPIView(APIView):
+    @swagger_auto_schema(
+        operation_description="Stop a task for a specific user.",
+        responses={
+            200: "Task stopped successfully",
+            500: "Internal Server Error",
+        },
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                "taskID": openapi.Schema(
+                    type=openapi.TYPE_STRING, description="Task ID"
+                ),
+                "email": openapi.Schema(
+                    type=openapi.TYPE_STRING, description="User email"
+                ),
+            },
+        ),
+    )
     def post(self, request):
         try:
-            task_id = request.data.get("task_id")
+            taskID = request.data.get("taskID")
             email = request.data.get("email")
             user = get_object_or_404(User, email=email)
-            task = get_object_or_404(Task, taskID=task_id)
+            task = get_object_or_404(Task, taskID=taskID)
             # 驗證操作的使用者和任務所有者相同
             if user == task.userID and task.status != "-1":
-                future = task_futures.get(task_id)
+                future = task_futures.get(taskID)
                 if future is not None:
                     future.cancel()
                 task.status = "-1"
@@ -123,3 +249,4 @@ def process_task(task):
     process_video(task)
     process_deepl(task)
     process_audio(task)
+    print(f"結束處理任務：{task.taskID}")

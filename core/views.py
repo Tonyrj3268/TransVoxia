@@ -1,6 +1,6 @@
 from django.shortcuts import render, get_object_or_404
 from django.core.files.storage import default_storage
-from django.http import Http404, JsonResponse
+from django.http import Http404, JsonResponse, FileResponse
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -216,6 +216,48 @@ class StopTaskAPIView(APIView):
             return Response(
                 {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class DownloadFileAPIView(APIView):
+    @swagger_auto_schema(
+        operation_description="Download specific files for a specific user.",
+        responses={
+            200: "OK",
+            400: "Bad Request",
+            401: "Unauthorized",
+            404: "File does not exist",
+        },
+        manual_parameters=[
+            openapi.Parameter(
+                "taskID",
+                openapi.IN_QUERY,
+                description="Task ID",
+                type=openapi.TYPE_STRING,
+            ),
+            openapi.Parameter(
+                "email",
+                openapi.IN_QUERY,
+                description="User email",
+                type=openapi.TYPE_STRING,
+            ),
+        ],
+    )
+    def get(self, request):
+        taskID = request.GET.get("taskID")
+        email = request.GET.get("email")
+        if not taskID or not email:
+            return Response("Bad Request", status=status.HTTP_400_BAD_REQUEST)
+        task = get_object_or_404(Task, taskID=taskID)
+        user = get_object_or_404(User, email=email)
+
+        if user != task.userID:
+            return Response("Unauthorized", status=status.HTTP_401_UNAUTHORIZED)
+
+        file_path = str(task.file)
+        try:
+            return FileResponse(open(file_path, "rb"), as_attachment=True)
+        except FileNotFoundError:
+            return Response("File does not exist", status=status.HTTP_404_NOT_FOUND)
 
 
 @csrf_exempt

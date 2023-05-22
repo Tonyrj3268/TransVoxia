@@ -8,3 +8,5 @@ openai
 pydub
 djangorestframework
 django-rest-swagger
+drf-yasg
+django-cors-headers

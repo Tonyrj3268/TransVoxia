@@ -8,8 +8,14 @@ from .settings import *
 INSTALLED_APPS += [
     # 添加您的假視圖所在的應用程式
     "fake_api.apps.FakeApiConfig",
+    "corsheaders"
 ]
 
+MIDDLEWARE += [
+    "corsheaders.middleware.CorsMiddleware"
+]
+
+CORS_ORIGIN_ALLOW_ALL = True
 # 路由設定
 ROOT_URLCONF = "Graduation_Project.fake_urls"
 

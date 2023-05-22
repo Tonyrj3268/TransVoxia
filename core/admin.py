@@ -16,6 +16,7 @@ class Task_Info_Admin(admin.ModelAdmin):
     list_display = (
         "taskID",
         "userID",
+        "title",
         "file",
         "request_time",
         "target_language",

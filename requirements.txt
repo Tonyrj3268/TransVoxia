@@ -9,4 +9,4 @@ pydub
 djangorestframework
 django-rest-swagger
 drf-yasg
-gunicorn==20.1.0
+django-cors-headers

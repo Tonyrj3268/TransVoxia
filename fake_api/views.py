@@ -267,8 +267,13 @@ class DownloadFileAPIView(APIView):
         if user != task.userID:
             return Response("Unauthorized", status=status.HTTP_401_UNAUTHORIZED)
 
+<<<<<<< HEAD
         file_path = "/video-temp/30_complete_audio_new.mp3"
+=======
+        file_path = '../video-temp/30_complete_audio_new.mp3'
+>>>>>>> b5ed49a07962be2f3d137761e7d1106a25580a9e
         try:
             return FileResponse(open(file_path, "rb"), as_attachment=True)
         except FileNotFoundError:
+            print("not found")
             return Response("File does not exist", status=status.HTTP_404_NOT_FOUND)

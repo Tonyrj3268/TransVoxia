@@ -13,7 +13,6 @@ RUN pip install -r requirements.txt
 # 将当前目录复制到容器中
 COPY . .
 
-COPY video-temp /app/video-temp
 # 设置环境变量
 ENV PORT=8001
 

@@ -11,6 +11,9 @@ from pydub.utils import mediainfo
 
 
 def process_audio(task: Task):
+    task.refresh_from_db()
+    if task.status == "-1":
+        raise Exception("任務已被取消")
     text = Deepl.objects.get(taskID=task).translated_text
     voice = task.voice_selection
     origin_length = Video.objects.get(taskID=task).length
@@ -18,17 +21,18 @@ def process_audio(task: Task):
     text_chunks = split_text_into_chunks(text, chunk_size=2500)
 
     audio_file_paths = []
+    task_file_name = os.path.basename(str(task.file))[:-4]
+
     for i, text_chunk in enumerate(text_chunks):
         dic = make_voice(text_chunk, voice, 100)
         url = dic["audioUrl"]
-
         # 下載音訊檔案並儲存到本地，然後將路徑添加到列表中
-        audio_file_path = f"video-temp/{task.taskID}_audio_{i}.mp3"
+        audio_file_path = f"video-temp/{task_file_name}_{i}.mp3"
         download_audio(url, audio_file_path)
         audio_file_paths.append(audio_file_path)
 
     # 將所有音訊檔案合併為一個完整的音訊檔案
-    combined_audio_path = f"video-temp/{task.taskID}_complete_audio.mp3"
+    combined_audio_path = f"video-temp/{task_file_name}_complete.mp3"
     combine_audio_files(audio_file_paths, combined_audio_path)
     length_ratio = round(
         get_audio_length(combined_audio_path) / float(origin_length), 3
@@ -37,7 +41,7 @@ def process_audio(task: Task):
     fast_sound = speed_change(
         AudioSegment.from_file(combined_audio_path, format="mp3"), length_ratio
     )
-    combined_audio_new_path = f"video-temp/{task.taskID}_complete_audio_new.mp3"
+    combined_audio_new_path = f"downloads/{task_file_name}.mp3"
     fast_sound.export(combined_audio_new_path, format="mp3")
     Play_ht.objects.create(
         taskID=task,
@@ -46,7 +50,10 @@ def process_audio(task: Task):
         length_ratio=length_ratio,
         status=True,
     )
-
+    print("----------聲音生成完成----------")
+    task.refresh_from_db()
+    if task.status == "-1":
+        raise Exception("任務已被取消")
     task.status = "3"
     task.save()
 
@@ -64,7 +71,6 @@ def make_voice(text, voice, speed):
     response = requests.request(
         "POST", "https://play.ht/api/v1/convert", headers=headers, data=payload
     )
-    print(response.json())
     id = response.json()["transcriptionId"]
     url = "https://play.ht/api/v1/articleStatus?transcriptionId=" + id
     print("----------生成聲音中----------")
@@ -75,6 +81,7 @@ def make_voice(text, voice, speed):
         if i > 12:
             print("請求超時")
             break
+    print(dic)
     return dic
 
 
@@ -87,7 +94,6 @@ def check_voice_make(url):
             k: True if v == "true" else False if v == "false" else v for k, v in x
         },
     )
-    print(dict_data)
     if dict_data["message"] == "Transcription still in progress":
         print("請稍等")
         time.sleep(10)
@@ -125,7 +131,6 @@ def split_text_into_chunks(text, chunk_size):
 
 def get_audio_length(audio_path):
     info = mediainfo(audio_path)
-    print(float(info["duration"]))
     return float(info["duration"])
 
 

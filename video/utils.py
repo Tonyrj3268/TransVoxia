@@ -80,6 +80,9 @@ def get_audio_len(file_name):
 
 def store_video_info(task: Task, file_location, video_length):
     print("開始儲存影片")
+    task.refresh_from_db()
+    if task.status == "-1":
+        raise Exception("任務已被取消")
     Video.objects.create(
         taskID=task, file_location=file_location, length=video_length, status=True
     )
@@ -87,4 +90,7 @@ def store_video_info(task: Task, file_location, video_length):
 
 def store_transcript_info(task: Task, trans_text):
     print("開始儲存文字稿")
-    transcript = Transcript.objects.create(taskID=task, transcript=trans_text)
+    task.refresh_from_db()
+    if task.status == "-1":
+        raise Exception("任務已被取消")
+    Transcript.objects.create(taskID=task, transcript=trans_text)

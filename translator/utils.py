@@ -8,6 +8,9 @@ from core.models import Task
 def process_deepl(task: Task):
     if task:
         # 如果有未處理的URL，進行處理
+        task.refresh_from_db()
+        if task.status == "-1":
+            raise Exception("任務已被取消")
         dpl = Deepl.objects.create(taskID=task)
         text = Transcript.objects.get(taskID=task).transcript
         target_lan = task.target_language
@@ -15,6 +18,9 @@ def process_deepl(task: Task):
         dpl.translated_text = prompt
         dpl.status = True
         dpl.save()
+        task.refresh_from_db()
+        if task.status == "-1":
+            raise Exception("任務已被取消")
         task.status = "2"
         task.save()
 

@@ -10,6 +10,13 @@ COPY requirements.txt .
 # 安装依赖项
 RUN pip install -r requirements.txt
 
+# Install FFmpeg
+RUN apt-get update && \
+    apt-get install -y ffmpeg
+
+# Set environment variable for FFmpeg
+ENV PATH="/usr/bin/ffmpeg:${PATH}"
+
 # 将当前目录复制到容器中
 COPY . .
 

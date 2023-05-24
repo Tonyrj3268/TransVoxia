@@ -5,6 +5,7 @@ from mutagen.mp4 import MP4
 from .models import Video, Transcript
 from core.models import Task
 import openai
+from moviepy.editor import VideoFileClip, AudioFileClip
 
 # 定義與應用程式邏輯相關的工具函數（utils）
 
@@ -21,6 +22,24 @@ def process_video(task: Task):
     else:
         # 如果沒有未處理的URL，等待下一次啟動
         print("開始睡覺")
+
+
+def process_synthesis(task: Task):
+    # 讀取音頻檔案
+    audioFilePath = (task.file.name).split("/")[-1].split(".")[0] + ".mp3"
+    audioclip = AudioFileClip("downloads/" + audioFilePath)
+
+    # 讀取視頻檔案
+    videoclip = VideoFileClip(task.file.name)
+
+    # 將音頻添加到視頻檔案，替換原本的音軌
+    videoclip = videoclip.set_audio(audioclip)
+
+    # 將結果輸出為一個新的視頻檔案
+    output_path = (
+        "downloads/video/" + (task.file.name).split("/")[-1].split(".")[0] + ".mp4"
+    )
+    videoclip.write_videofile(output_path, codec="libx264")
 
 
 def download_youtube(url):

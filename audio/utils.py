@@ -41,7 +41,7 @@ def process_audio(task: Task):
     fast_sound = speed_change(
         AudioSegment.from_file(combined_audio_path, format="mp3"), length_ratio
     )
-    combined_audio_new_path = f"downloads/{task_file_name}.mp3"
+    combined_audio_new_path = f"downloads/audio/{task_file_name}.mp3"
     fast_sound.export(combined_audio_new_path, format="mp3")
     Play_ht.objects.create(
         taskID=task,

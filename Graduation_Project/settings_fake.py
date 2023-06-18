@@ -14,7 +14,6 @@ INSTALLED_APPS.remove("video.apps.VideoConfig")
 INSTALLED_APPS.remove("translator.apps.TranslatorConfig")
 INSTALLED_APPS.remove("audio.apps.AudioConfig")
 
-
 # 路由設定
 ROOT_URLCONF = "Graduation_Project.fake_urls"
 

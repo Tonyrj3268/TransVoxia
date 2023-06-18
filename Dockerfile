@@ -24,4 +24,4 @@ COPY . .
 ENV PORT=8001
 
 # 运行 Django 服务器
-CMD python manage.py runserver 0.0.0.0:$PORT --settings=Graduation_Project.settings_fake
+CMD python manage.py runserver 0.0.0.0:$PORT 

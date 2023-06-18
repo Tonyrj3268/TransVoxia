@@ -10,3 +10,4 @@ djangorestframework
 django-rest-swagger
 drf-yasg
 django-cors-headers
+moviepy

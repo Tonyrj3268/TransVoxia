@@ -33,6 +33,7 @@ schema_view = get_schema_view(
 )
 urlpatterns = [
     path("", include("core.urls")),
+    path("", include("chatgpt.urls")),
     path("admin/", admin.site.urls),
     re_path(
         r"^swagger(?P<format>\.json|\.yaml)$",

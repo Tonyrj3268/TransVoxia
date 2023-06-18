@@ -2,3 +2,5 @@ db.sqlite3
 video-temp
 __pycache__/
 .env
+uploads
+downloads

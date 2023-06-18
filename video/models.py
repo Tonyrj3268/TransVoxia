@@ -11,19 +11,7 @@ class Video(models.Model):
     upload_time = models.DateTimeField(auto_now_add=True)
     status = models.BooleanField(default=False)
 
-    def __str__(self):
-        return self.taskID.url
-
-    def get_task_url(self):
-        """
-        獲取當前任務的url
-        """
-        return self.taskID.url
-
 
 class Transcript(models.Model):
     taskID = models.ForeignKey(Task, on_delete=models.CASCADE, default=0)
     transcript = models.TextField()
-
-    def __str__(self):
-        return f"{self.taskID.url}"

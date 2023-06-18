@@ -13,22 +13,14 @@ from .models import Task, User
 from .forms import TaskForm
 from .serializers import TaskSerializer
 from video.models import Transcript
-from video.utils import process_video
+from video.utils import process_video, process_synthesis
 from audio.utils import process_audio
 from translator.utils import process_deepl
 import os
 import threading
-
+import base64
 
 # Create your views here.
-def index(request):
-    return render(request, "core/index.html")
-
-
-def status_page(request):
-    return render(request, "core/status.html")
-
-
 executor = ThreadPoolExecutor(max_workers=5)
 task_futures = {}
 
@@ -49,21 +41,58 @@ class TaskListAPIView(APIView):
                 description="User's email",
                 type=openapi.TYPE_STRING,
             ),
+            openapi.Parameter(
+                "n",
+                openapi.IN_QUERY,
+                description="Number of tasks to be returned in one page",
+                type=openapi.TYPE_INTEGER,
+            ),
+            openapi.Parameter(
+                "page",
+                openapi.IN_QUERY,
+                description="Page number",
+                type=openapi.TYPE_INTEGER,
+            ),
         ],
     )
     def get(self, request):
+        # Task.objects.get(taskID=50).delete()
         email = request.GET.get("email")
+        n = int(request.GET.get("n", 0))
+        page = int(request.GET.get("page", 1))
         try:
             user = User.objects.get(email=email) if email else None
-            tasks = (
-                Task.objects.filter(userID=user).order_by("-request_time")
-                if user
-                else None
-            )
-            serializer = TaskSerializer(tasks, many=True)
-            return Response(serializer.data)
+            if user:
+                tasks = Task.objects.filter(userID=user).order_by("-request_time")
+                tasks = tasks[(page - 1) * n : page * n]
+
+                task_results = []
+                for task in tasks:
+                    result = self.get_task_result(task)
+                    task_results.append(result)
+
+                return Response(task_results)
+
         except User.DoesNotExist:
             raise Http404("User does not exist")
+
+    @staticmethod
+    def get_task_result(task):
+        result = {"data": TaskSerializer(task).data}
+        fileName = task.file.name.split("/")[-1].split(".m4a")[0]
+        if task.mode == "video":
+            with open("downloads/video/" + fileName + ".mp4", "rb") as f:
+                result["mp4"] = base64.b64encode(f.read()).decode()
+            with open("downloads/audio/" + fileName + ".mp3", "rb") as f:
+                result["mp3"] = base64.b64encode(f.read()).decode()
+            result["transcript"] = Transcript.objects.get(taskID=task).transcript
+        elif task.mode == "audio":
+            with open("downloads/audio/" + fileName + ".mp3", "rb") as f:
+                result["mp3"] = base64.b64encode(f.read()).decode()
+            result["transcript"] = Transcript.objects.get(taskID=task).transcript
+        elif task.mode == "transcript":
+            result["transcript"] = Transcript.objects.get(taskID=task).transcript
+        return result
 
     @swagger_auto_schema(
         operation_description="Create a new task for a specific user.",
@@ -85,7 +114,7 @@ class TaskListAPIView(APIView):
                 in_=openapi.IN_QUERY,
                 type=openapi.TYPE_STRING,
                 description="Target Language",
-                enum=["KO", "EN", "ZH"],
+                enum=["KO", "EN-US", "ZH"],
                 required=True,
             ),
             openapi.Parameter(
@@ -144,11 +173,11 @@ class TaskListAPIView(APIView):
             file = request.FILES.get("file")
             if file:
                 _, file_extension = os.path.splitext(file.name)
-                if file_extension in [".mp4", ".m4a"]:
+                if file_extension in [".mp4", ".mov"]:
                     name = default_storage.save("uploads/video/" + file.name, file)
                     task.file = name
 
-                elif file_extension in [".mp3", ".wav"]:
+                elif file_extension in [".mp3", ".wav", ".m4a"]:
                     name = default_storage.save("uploads/audio/" + file.name, file)
                     task.file = name
                 else:
@@ -311,8 +340,14 @@ class DownloadFileAPIView(APIView):
 
         if user != task.userID:
             return Response("Unauthorized", status=status.HTTP_401_UNAUTHORIZED)
-
-        file_path = "downloads/" + os.path.basename(str(task.file))[:-4] + ".mp3"
+        if task.mode == "video":
+            file_path = (
+                "downloads/video/" + os.path.basename(str(task.file))[:-4] + ".mp4"
+            )
+        elif task.mode == "audio":
+            file_path = (
+                "downloads/audio/" + os.path.basename(str(task.file))[:-4] + ".mp3"
+            )
         try:
             return FileResponse(open(file_path, "rb"), as_attachment=True)
         except FileNotFoundError:
@@ -324,7 +359,13 @@ def process_task(task):
     try:
         process_video(task)
         process_deepl(task)
-        process_audio(task)
+        if task.mode == "audio":
+            process_audio(task)
+        if task.mode == "video":
+            process_audio(task)
+            # 一個function用作將mp3和mp4合成
+            process_synthesis(task)
+
     except Exception as e:
         print(f"強制結束任務：{task.taskID}, 錯誤：{str(e)}")
     print(f"結束處理任務：{task.taskID}")

@@ -21,7 +21,7 @@ def process_audio(task: Task):
     text_chunks = split_text_into_chunks(text, chunk_size=2500)
 
     audio_file_paths = []
-    task_file_name = os.path.basename(str(task.file))[:-4]
+    task_file_name = os.path.basename(task.file.name)[:-4]
 
     for i, text_chunk in enumerate(text_chunks):
         dic = make_voice(text_chunk, voice, 100)
@@ -71,6 +71,7 @@ def make_voice(text, voice, speed):
     response = requests.request(
         "POST", "https://play.ht/api/v1/convert", headers=headers, data=payload
     )
+    print(response.json())
     id = response.json()["transcriptionId"]
     url = "https://play.ht/api/v1/articleStatus?transcriptionId=" + id
     print("----------生成聲音中----------")

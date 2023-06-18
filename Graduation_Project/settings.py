@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "video.apps.VideoConfig",
     "translator.apps.TranslatorConfig",
     "audio.apps.AudioConfig",
+    "chatgpt.apps.ChatgptConfig",
     "corsheaders",
 ]
 

@@ -2,6 +2,7 @@ from yt_dlp import YoutubeDL
 import whisper
 import os
 from mutagen.mp4 import MP4
+from mutagen.mp3 import MP3
 from .models import Video, Transcript
 from core.models import Task
 import openai
@@ -80,19 +81,28 @@ def generate_transcript_from_chatgpt(task: Task):
 
 
 def generate_transcript_from_file(task: Task):
-    location = str(task.file)
+    location = task.file.name
     openai.api_key = os.getenv("OPENAI_API_KEY")
     audio_file = open(location, "rb")
     transcript = openai.Audio.transcribe("whisper-1", audio_file)
-    length = get_audio_len(location)
+    if location.split(".")[-1] in ["mp4", "m4a"]:
+        length = get_video_len(location)
+    elif location.split(".")[-1] in ["mp3", "wav"]:
+        length = get_audio_len(location)
     print(transcript)
     print("----------文字稿已生成----------")
     store_video_info(task, location, length)
     return transcript["text"]
 
 
+def get_video_len(file_name):
+    video = MP4(file_name)
+    length = video.info.length
+    return length
+
+
 def get_audio_len(file_name):
-    audio = MP4(file_name)
+    audio = MP3(file_name)
     length = audio.info.length
     return length
 

@@ -1,5 +1,6 @@
 from django.shortcuts import render, get_object_or_404
 from django.core.files.storage import default_storage
+from django.conf import settings
 from django.http import Http404, JsonResponse, FileResponse
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.views import APIView
@@ -17,6 +18,7 @@ from video.utils import process_video, process_synthesis
 from audio.utils import process_audio
 from translator.utils import process_deepl
 import os
+import errno
 import threading
 import base64
 
@@ -31,7 +33,7 @@ class TaskListAPIView(APIView):
     @swagger_auto_schema(
         operation_description="Get a list of tasks for a specific user.",
         responses={
-            200: "OK",
+            200: openapi.Response("OK", TaskSerializer),
             404: "User does not exist",
         },
         manual_parameters=[
@@ -79,7 +81,7 @@ class TaskListAPIView(APIView):
     @staticmethod
     def get_task_result(task):
         result = {"data": TaskSerializer(task).data}
-        fileName = task.file.name.split("/")[-1].split(".m4a")[0]
+        fileName = task.fileLocation.split("/")[-1].split(".m4a")[0]
         if task.mode == "video":
             with open("downloads/video/" + fileName + ".mp4", "rb") as f:
                 result["mp4"] = base64.b64encode(f.read()).decode()
@@ -174,12 +176,24 @@ class TaskListAPIView(APIView):
             if file:
                 _, file_extension = os.path.splitext(file.name)
                 if file_extension in [".mp4", ".mov"]:
-                    name = default_storage.save("uploads/video/" + file.name, file)
-                    task.file = name
+                    filename = default_storage.get_available_name(
+                        "origin/video/" + file.name
+                    )
+                    name = default_storage.save(filename, file)
+                    task.fileLocation = name
+                    with open(name, "wb") as destination:
+                        for chunk in file.chunks():
+                            destination.write(chunk)
 
                 elif file_extension in [".mp3", ".wav", ".m4a"]:
-                    name = default_storage.save("uploads/audio/" + file.name, file)
-                    task.file = name
+                    filename = default_storage.get_available_name(
+                        "origin/audio/" + file.name
+                    )
+                    name = default_storage.save(filename, file)
+                    task.fileLocation = name
+                    with open(name, "wb") as destination:
+                        for chunk in file.chunks():
+                            destination.write(chunk)
                 else:
                     raise Exception("File type not supported")
                 task.save()
@@ -293,13 +307,11 @@ class StopTaskAPIView(APIView):
             user = get_object_or_404(User, email=email)
             task = get_object_or_404(Task, taskID=taskID)
             # 驗證操作的使用者和任務所有者相同
-            if user == task.userID and task.status != "-1":
-                # future = task_futures[taskID]
-                # if future is not None:
-                #     future.cancel()
-                task.status = "-1"
-                task.save()
-            return Response({"msg": "已取消"}, status=status.HTTP_200_OK)
+            if user == task.userID:
+                if task.status == "-1":
+                    return Response(
+                        {"msg": "任務已被取消，不進行任何操作"}, status=status.HTTP_200_OK
+                    )
         except Exception as e:
             return Response(
                 {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -342,14 +354,19 @@ class DownloadFileAPIView(APIView):
             return Response("Unauthorized", status=status.HTTP_401_UNAUTHORIZED)
         if task.mode == "video":
             file_path = (
-                "downloads/video/" + os.path.basename(str(task.file))[:-4] + ".mp4"
+                "translated/video/"
+                + os.path.basename(str(task.fileLocation))[:-4]
+                + ".mp4"
             )
         elif task.mode == "audio":
             file_path = (
-                "downloads/audio/" + os.path.basename(str(task.file))[:-4] + ".mp3"
+                "translated/audio/"
+                + os.path.basename(str(task.fileLocation))[:-4]
+                + ".mp3"
             )
         try:
-            return FileResponse(open(file_path, "rb"), as_attachment=True)
+            file_url = default_storage.url(file_path)
+            return JsonResponse({"file_url": file_url})
         except FileNotFoundError:
             return Response("File does not exist", status=status.HTTP_404_NOT_FOUND)
 
@@ -368,4 +385,18 @@ def process_task(task):
 
     except Exception as e:
         print(f"強制結束任務：{task.taskID}, 錯誤：{str(e)}")
+    audioFilePath = (task.fileLocation).split("/")[-1].split(".")[0] + ".mp3"
+    file_paths = ["downloads/audio/" + audioFilePath, task.fileLocation]
+
+    for file_path in file_paths:
+        try:
+            os.remove(file_path)
+            print(f"已成功刪除檔案：{file_path}")
+        except OSError as e:
+            if e.errno == errno.ENOENT:  # 檔案不存在的錯誤
+                print(f"檔案不存在，無法刪除: {file_path}")
+            elif e.errno == errno.EACCES:  # 檔案或目錄無法存取的錯誤
+                print(f"檔案正在被使用，無法刪除: {file_path}")
+            else:
+                print(f"刪除檔案時發生錯誤: {file_path} - {str(e)}")
     print(f"結束處理任務：{task.taskID}")

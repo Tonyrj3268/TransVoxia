@@ -17,7 +17,7 @@ class Task(models.Model):
     taskID = models.AutoField(primary_key=True)
     userID = models.ForeignKey(User, on_delete=models.CASCADE)
     title = models.CharField(max_length=255)
-    file = models.FileField(upload_to="uploads/", null=True)
+    fileLocation = models.CharField(max_length=50, default="找不到該檔案")
     request_time = models.DateTimeField(auto_now_add=True)
     target_language = models.CharField(max_length=255)
     # make a list with tuples and contains these languages with key and same value， ["ko-KR-Standard-A", "larry", "zh-TW-YunJheNeural"]

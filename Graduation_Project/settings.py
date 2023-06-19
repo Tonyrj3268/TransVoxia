@@ -152,3 +152,20 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_SCHEMA_CLASS": "rest_framework.schemas.coreapi.AutoSchema",
 }
+
+from google.cloud import storage
+
+DEFAULT_FILE_STORAGE = "storages.backends.gcloud.GoogleCloudStorage"
+GS_BUCKET_NAME = os.getenv("GOOGLE_CLOUD_STORAGE_BUCKET_NAME")
+GS_FILE_OVERWRITE = False
+GOOGLE_CLOUD_STORAGE_BUCKET_NAME = os.getenv("GOOGLE_CLOUD_STORAGE_BUCKET_NAME")
+GOOGLE_APPLICATION_CREDENTIALS = os.path.join(
+    BASE_DIR, "credentials/gcs-service-account-key.json"
+)
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = GOOGLE_APPLICATION_CREDENTIALS
+# 初始化 Google Cloud Storage 客户端
+storage_client = storage.Client()
+GOOGLE_CLOUD_STORAGE_BUCKET = storage_client.get_bucket(
+    GOOGLE_CLOUD_STORAGE_BUCKET_NAME
+)
+# Django settings.py

@@ -1,6 +1,5 @@
 db.sqlite3
-video-temp
 __pycache__/
 .env
-uploads
-downloads
+credentials/gcs-service-account-key.json
+

@@ -21,7 +21,7 @@ def process_audio(task: Task):
     text_chunks = split_text_into_chunks(text, chunk_size=2500)
 
     audio_file_paths = []
-    task_file_name = os.path.basename(task.file.name)[:-4]
+    task_file_name = os.path.basename(task.fileLocation)[:-4]
 
     for i, text_chunk in enumerate(text_chunks):
         dic = make_voice(text_chunk, voice, 100)
@@ -34,6 +34,7 @@ def process_audio(task: Task):
     # 將所有音訊檔案合併為一個完整的音訊檔案
     combined_audio_path = f"video-temp/{task_file_name}_complete.mp3"
     combine_audio_files(audio_file_paths, combined_audio_path)
+
     length_ratio = round(
         get_audio_length(combined_audio_path) / float(origin_length), 3
     )
@@ -41,6 +42,9 @@ def process_audio(task: Task):
     fast_sound = speed_change(
         AudioSegment.from_file(combined_audio_path, format="mp3"), length_ratio
     )
+    for path in audio_file_paths:
+        os.remove(path)
+    os.remove(combined_audio_path)
     combined_audio_new_path = f"downloads/audio/{task_file_name}.mp3"
     fast_sound.export(combined_audio_new_path, format="mp3")
     Play_ht.objects.create(

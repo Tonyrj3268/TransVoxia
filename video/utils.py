@@ -1,12 +1,14 @@
 from yt_dlp import YoutubeDL
 import whisper
 import os
+import errno
 from mutagen.mp4 import MP4
 from mutagen.mp3 import MP3
 from .models import Video, Transcript
 from core.models import Task
 import openai
 from moviepy.editor import VideoFileClip, AudioFileClip
+from django.core.files.storage import default_storage
 
 # 定義與應用程式邏輯相關的工具函數（utils）
 
@@ -26,85 +28,42 @@ def process_video(task: Task):
 
 
 def process_synthesis(task: Task):
+    print("開始處理合成")
     # 讀取音頻檔案
-    audioFilePath = (task.file.name).split("/")[-1].split(".")[0] + ".mp3"
-    audioclip = AudioFileClip("downloads/" + audioFilePath)
+    audioFilePath = (task.fileLocation).split("/")[-1].split(".")[0] + ".mp3"
+    audioclip = AudioFileClip("downloads/audio/" + audioFilePath)
 
     # 讀取視頻檔案
-    videoclip = VideoFileClip(task.file.name)
+    videoclip = VideoFileClip(task.fileLocation)
 
     # 將音頻添加到視頻檔案，替換原本的音軌
-    videoclip = videoclip.set_audio(audioclip)
+    newVideoclip = videoclip.set_audio(audioclip)
 
     # 將結果輸出為一個新的視頻檔案
     output_path = (
-        "downloads/video/" + (task.file.name).split("/")[-1].split(".")[0] + ".mp4"
+        "translated/video/" + (task.fileLocation).split("/")[-1].split(".")[0] + ".mp4"
     )
-    videoclip.write_videofile(output_path, codec="libx264")
-
-
-def download_youtube(url):
-    ydl_opts = {}
-    ydl_opts["format"] = "m4a"
-    ydl_opts["outtmpl"] = "video-temp/" + "%(id)s.%(ext)s"
-
-    with YoutubeDL(ydl_opts) as ydl:
-        ydl.download([url])
-
-
-def generate_transcript_from_url(task: Task):
-    url = task.url
-    location = "video-temp/" + url.split("watch?v=")[1].split("&")[0] + ".m4a"
-    if not os.path.isfile(location):
-        download_youtube(url)
-    model = whisper.load_model("small")
-    result_m4a = model.transcribe(location)
-    trans_text = result_m4a["text"]
-    length = get_audio_len(location)
-    store_video_info(task, location, length)
-    return trans_text
-
-
-def generate_transcript_from_chatgpt(task: Task):
-    url = task.url
-    location = "video-temp/" + url.split("watch?v=")[1].split("&")[0] + ".m4a"
-    if not os.path.isfile(location):
-        download_youtube(url)
-    openai.api_key = os.getenv("OPENAI_API_KEY")
-    audio_file = open(location, "rb")
-    transcript = openai.Audio.transcribe("whisper-1", audio_file)
-    length = get_audio_len(location)
-    print(transcript)
-    print("----------文字稿已生成----------")
-    store_video_info(task, location, length)
-    return transcript["text"]
+    newVideoclip.write_videofile(output_path, codec="libx264")
+    with open(output_path, "rb") as output_file:
+        default_storage.save(output_path, output_file)
+    audioclip.close()
+    videoclip.close()
+    newVideoclip.close()
 
 
 def generate_transcript_from_file(task: Task):
-    location = task.file.name
+    location = task.fileLocation
     openai.api_key = os.getenv("OPENAI_API_KEY")
-    audio_file = open(location, "rb")
-    transcript = openai.Audio.transcribe("whisper-1", audio_file)
+    with open(location, "rb") as audio_file:
+        transcript = openai.Audio.transcribe("whisper-1", audio_file)
     if location.split(".")[-1] in ["mp4", "m4a"]:
-        length = get_video_len(location)
+        length = MP4(location).info.length
     elif location.split(".")[-1] in ["mp3", "wav"]:
-        length = get_audio_len(location)
+        length = MP3(location).info.length
     print(transcript)
     print("----------文字稿已生成----------")
     store_video_info(task, location, length)
     return transcript["text"]
-
-
-def get_video_len(file_name):
-    video = MP4(file_name)
-    length = video.info.length
-    return length
-
-
-def get_audio_len(file_name):
-    audio = MP3(file_name)
-    length = audio.info.length
-    return length
 
 
 def store_video_info(task: Task, file_location, video_length):

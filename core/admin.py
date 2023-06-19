@@ -17,7 +17,7 @@ class Task_Info_Admin(admin.ModelAdmin):
         "taskID",
         "userID",
         "title",
-        "file",
+        "fileLocation",
         "request_time",
         "target_language",
         "voice_selection",

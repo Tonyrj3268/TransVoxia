@@ -9,5 +9,5 @@ from drf_yasg import openapi
 
 
 urlpatterns = [
-    path("api/chatgpt/", ChatViewSet.as_view(), name="chatgpt"),
+    path("chatgpt/", ChatViewSet.as_view(), name="chatgpt"),
 ]

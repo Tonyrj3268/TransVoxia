@@ -30,9 +30,7 @@ SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = [".fly.dev", "127.0.0.1", "localhost", "*"]
-CSRF_TRUSTED_ORIGINS = ["https://*.fly.dev"]
-
+ALLOWED_HOSTS = ["127.0.0.1", "localhost", "*"]
 
 # Application definition
 
@@ -43,17 +41,26 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "corsheaders",
     "rest_framework",
     "drf_yasg",
+    "dj_rest_auth",
+    "dj_rest_auth.registration",
+    "allauth",
+    "allauth.account",
+    "allauth.socialaccount",
+    "rest_framework.authtoken",
     "core.apps.CoreConfig",
     "video.apps.VideoConfig",
     "translator.apps.TranslatorConfig",
     "audio.apps.AudioConfig",
     "chatgpt.apps.ChatgptConfig",
-    "corsheaders",
+    "accounts.apps.AccountsConfig",
+    "subscription.apps.SubscriptionConfig",
 ]
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -61,7 +68,6 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
 ]
 
 CORS_ORIGIN_ALLOW_ALL = True
@@ -152,6 +158,12 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_SCHEMA_CLASS": "rest_framework.schemas.coreapi.AutoSchema",
 }
+SWAGGER_SETTINGS = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+    ],
+}
+
 
 from google.cloud import storage
 
@@ -168,4 +180,13 @@ storage_client = storage.Client()
 GOOGLE_CLOUD_STORAGE_BUCKET = storage_client.get_bucket(
     GOOGLE_CLOUD_STORAGE_BUCKET_NAME
 )
-# Django settings.py
+
+# dj-rest-auth
+AUTH_USER_MODEL = "accounts.CustomUser"
+ACCOUNT_AUTHENTICATION_METHOD = "username_email"
+# ACCOUNT_EMAIL_VERIFICATION = "mandatory"
+SITE_ID = 1
+AUTHENTICATION_BACKENDS = [
+    # allauth specific authentication methods, such as login by e-mail
+    "allauth.account.auth_backends.AuthenticationBackend",
+]

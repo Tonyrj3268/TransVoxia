@@ -1,23 +1,12 @@
 from django.db import models
-
-
-class User(models.Model):
-    userID = models.AutoField(primary_key=True)
-    membership_level = models.CharField(max_length=255)
-    expiration_date = models.DateField()
-    email = models.EmailField(
-        max_length=255, unique=True, default="default@example.com"
-    )
-    password = models.CharField(max_length=255)
-    fb_id = models.CharField(max_length=255, blank=True)
-    google_id = models.CharField(max_length=255, blank=True)
+from django.conf import settings
 
 
 class Task(models.Model):
     taskID = models.AutoField(primary_key=True)
-    userID = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     title = models.CharField(max_length=255)
-    fileLocation = models.CharField(max_length=50, default="找不到該檔案")
+    fileLocation = models.CharField(max_length=255, blank=True)
     request_time = models.DateTimeField(auto_now_add=True)
     target_language = models.CharField(max_length=255)
     # make a list with tuples and contains these languages with key and same value， ["ko-KR-Standard-A", "larry", "zh-TW-YunJheNeural"]
@@ -35,7 +24,8 @@ class Task(models.Model):
         ("1", "文字稿生成完成"),
         ("2", "Deepl翻譯完成"),
         ("3", "Play.ht語音生成完成"),
-        ("4", "Status 4"),
+        ("4", "任務完成"),
+        ("-1", "任務失敗"),
         (None, "N/A"),
     ]
     status = models.CharField(choices=STATUS_CHOICES, max_length=50)

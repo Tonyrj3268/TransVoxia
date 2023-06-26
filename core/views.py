@@ -1,5 +1,6 @@
 from django.shortcuts import render, get_object_or_404
 from django.core.files.storage import default_storage
+from django.core.exceptions import PermissionDenied
 from django.conf import settings
 from django.http import Http404, JsonResponse, FileResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -10,8 +11,9 @@ from concurrent.futures import ThreadPoolExecutor
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from rest_framework.parsers import MultiPartParser
-from .models import Task, User
-from .forms import TaskForm
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import permission_classes
+from .models import Task
 from .serializers import TaskSerializer
 from video.models import Transcript
 from video.utils import process_video, process_synthesis
@@ -38,10 +40,11 @@ class TaskListAPIView(APIView):
         },
         manual_parameters=[
             openapi.Parameter(
-                "email",
-                openapi.IN_QUERY,
-                description="User's email",
+                name="Authorization",
+                in_=openapi.IN_HEADER,
                 type=openapi.TYPE_STRING,
+                description="Token",
+                required=True,
             ),
             openapi.Parameter(
                 "n",
@@ -57,43 +60,37 @@ class TaskListAPIView(APIView):
             ),
         ],
     )
+    @permission_classes([IsAuthenticated])
     def get(self, request):
-        # Task.objects.get(taskID=50).delete()
-        email = request.GET.get("email")
         n = int(request.GET.get("n", 0))
         page = int(request.GET.get("page", 1))
-        try:
-            user = User.objects.get(email=email) if email else None
-            if user:
-                tasks = Task.objects.filter(userID=user).order_by("-request_time")
-                tasks = tasks[(page - 1) * n : page * n]
+        if request.user.is_authenticated:
+            user = request.user
+            tasks = Task.objects.filter(user=user).order_by("-request_time")
+            tasks = tasks[(page - 1) * n : page * n]
 
-                task_results = []
-                for task in tasks:
-                    result = self.get_task_result(task)
-                    task_results.append(result)
+            task_results = []
+            for task in tasks:
+                result = self.get_task_result(task)
+                task_results.append(result)
 
-                return Response(task_results)
-
-        except User.DoesNotExist:
-            raise Http404("User does not exist")
+            return Response(task_results)
+        else:
+            raise PermissionDenied("You must be logged in to view tasks.")
 
     @staticmethod
     def get_task_result(task):
         result = {"data": TaskSerializer(task).data}
-        fileName = task.fileLocation.split("/")[-1].split(".m4a")[0]
-        if task.mode == "video":
-            with open("downloads/video/" + fileName + ".mp4", "rb") as f:
-                result["mp4"] = base64.b64encode(f.read()).decode()
-            with open("downloads/audio/" + fileName + ".mp3", "rb") as f:
-                result["mp3"] = base64.b64encode(f.read()).decode()
-            result["transcript"] = Transcript.objects.get(taskID=task).transcript
-        elif task.mode == "audio":
-            with open("downloads/audio/" + fileName + ".mp3", "rb") as f:
-                result["mp3"] = base64.b64encode(f.read()).decode()
-            result["transcript"] = Transcript.objects.get(taskID=task).transcript
-        elif task.mode == "transcript":
-            result["transcript"] = Transcript.objects.get(taskID=task).transcript
+        fileName = task.fileLocation.split("/")[2].split(".")[0]
+        base_url = os.getenv("GOOGLE_CLOUD_STORAGE_BUCKET_OPEN_URL") + "translated/"
+        transcript = Transcript.objects.get(taskID=task).transcript
+
+        result["transcript"] = transcript
+        if task.mode in ["video", "audio"]:
+            result["mp3"] = base_url + "audio/" + fileName + ".mp3"
+            if task.mode == "video":
+                result["mp4"] = base_url + "video/" + fileName + ".mp4"
+
         return result
 
     @swagger_auto_schema(
@@ -105,10 +102,10 @@ class TaskListAPIView(APIView):
         request_body=None,
         manual_parameters=[
             openapi.Parameter(
-                name="email",
-                in_=openapi.IN_QUERY,
+                name="Authorization",
+                in_=openapi.IN_HEADER,
                 type=openapi.TYPE_STRING,
-                description="User email",
+                description="Bearer <JWT Token>",
                 required=True,
             ),
             openapi.Parameter(
@@ -158,42 +155,26 @@ class TaskListAPIView(APIView):
             ),
         ],
     )
+    @permission_classes([IsAuthenticated])
     def post(self, request):
         try:
-            email = request.GET.get("email")
-            user = get_object_or_404(User, email=email)
-            task = Task.objects.create(userID=user)
-            task.target_language = request.GET.get("target_language")
-            task.voice_selection = request.GET.get("voice_selection")
-            task.mode = request.GET.get("mode")
-            task.title = request.GET.get("title")
-            if request.GET.get("editmode") == "true":
-                task.edit_mode = True
-            else:
-                task.edit_mode = False
+            user = request.user
+            task = Task.objects.create(
+                user=user,
+                target_language=request.GET.get("target_language"),
+                voice_selection=request.GET.get("voice_selection"),
+                mode=request.GET.get("mode"),
+                title=request.GET.get("title"),
+                edit_mode=request.GET.get("editmode") == "true",
+            )
 
             file = request.FILES.get("file")
             if file:
                 _, file_extension = os.path.splitext(file.name)
                 if file_extension in [".mp4", ".mov"]:
-                    filename = default_storage.get_available_name(
-                        "origin/video/" + file.name
-                    )
-                    name = default_storage.save(filename, file)
-                    task.fileLocation = name
-                    with open(name, "wb") as destination:
-                        for chunk in file.chunks():
-                            destination.write(chunk)
-
+                    task.fileLocation = self.handle_file(file, "origin/video/")
                 elif file_extension in [".mp3", ".wav", ".m4a"]:
-                    filename = default_storage.get_available_name(
-                        "origin/audio/" + file.name
-                    )
-                    name = default_storage.save(filename, file)
-                    task.fileLocation = name
-                    with open(name, "wb") as destination:
-                        for chunk in file.chunks():
-                            destination.write(chunk)
+                    task.fileLocation = self.handle_file(file, "origin/audio/")
                 else:
                     raise Exception("File type not supported")
                 task.save()
@@ -208,6 +189,19 @@ class TaskListAPIView(APIView):
                 {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+    @staticmethod
+    def handle_file(file, location):
+        """
+        check if file name already exists, if so, add suffix to the file name,
+        then save the file to the google cloud and the local location.
+        """
+        filename = default_storage.get_available_name(location + file.name)
+        name = default_storage.save(filename, file)
+        with open(name, "wb") as destination:
+            for chunk in file.chunks():
+                destination.write(chunk)
+        return name
+
 
 class ChangeTaskAPIView(APIView):
     @swagger_auto_schema(
@@ -218,6 +212,13 @@ class ChangeTaskAPIView(APIView):
             400: "Invalid field",
         },
         manual_parameters=[
+            openapi.Parameter(
+                name="Authorization",
+                in_=openapi.IN_HEADER,
+                type=openapi.TYPE_STRING,
+                description="Bearer <JWT Token>",
+                required=True,
+            ),
             openapi.Parameter(
                 name="taskID",
                 in_=openapi.IN_QUERY,
@@ -234,13 +235,6 @@ class ChangeTaskAPIView(APIView):
                 required=True,
             ),
             openapi.Parameter(
-                name="email",
-                in_=openapi.IN_QUERY,
-                type=openapi.TYPE_STRING,
-                description="User email",
-                required=True,
-            ),
-            openapi.Parameter(
                 name="new_value",
                 in_=openapi.IN_QUERY,
                 type=openapi.TYPE_STRING,
@@ -249,20 +243,20 @@ class ChangeTaskAPIView(APIView):
             ),
         ],
     )
+    @permission_classes([IsAuthenticated])
     def post(self, request):
         taskID = request.GET.get("taskID")
         field = request.GET.get("field")
-        email = request.GET.get("email")
         new_value = request.GET.get("new_value")
 
-        user = get_object_or_404(User, email=email)
+        user = request.user
 
         try:
             task = Task.objects.get(taskID=taskID)
         except Task.DoesNotExist:
             return Response({"error": "Task not found."}, status=404)
 
-        if user == task.userID:
+        if user == task.user:
             if field == "title":
                 task.title = new_value
                 task.save()
@@ -285,29 +279,29 @@ class StopTaskAPIView(APIView):
         },
         manual_parameters=[
             openapi.Parameter(
+                name="Authorization",
+                in_=openapi.IN_HEADER,
+                type=openapi.TYPE_STRING,
+                description="Bearer <JWT Token>",
+                required=True,
+            ),
+            openapi.Parameter(
                 name="taskID",
                 in_=openapi.IN_QUERY,
                 type=openapi.TYPE_STRING,
                 description="Task ID",
                 required=True,
             ),
-            openapi.Parameter(
-                name="email",
-                in_=openapi.IN_QUERY,
-                type=openapi.TYPE_STRING,
-                description="User email",
-                required=True,
-            ),
         ],
     )
+    @permission_classes([IsAuthenticated])
     def post(self, request):
         try:
             taskID = request.GET.get("taskID")
-            email = request.GET.get("email")
-            user = get_object_or_404(User, email=email)
+            user = request.user
             task = get_object_or_404(Task, taskID=taskID)
             # 驗證操作的使用者和任務所有者相同
-            if user == task.userID:
+            if user == task.user:
                 if task.status == "-1":
                     return Response(
                         {"msg": "任務已被取消，不進行任何操作"}, status=status.HTTP_200_OK
@@ -329,28 +323,29 @@ class DownloadFileAPIView(APIView):
         },
         manual_parameters=[
             openapi.Parameter(
+                name="Authorization",
+                in_=openapi.IN_HEADER,
+                type=openapi.TYPE_STRING,
+                description="Bearer <JWT Token>",
+                required=True,
+            ),
+            openapi.Parameter(
                 "taskID",
                 openapi.IN_QUERY,
                 description="Task ID",
                 type=openapi.TYPE_STRING,
             ),
-            openapi.Parameter(
-                "email",
-                openapi.IN_QUERY,
-                description="User email",
-                type=openapi.TYPE_STRING,
-            ),
         ],
     )
+    @permission_classes([IsAuthenticated])
     def get(self, request):
         taskID = request.GET.get("taskID")
-        email = request.GET.get("email")
-        if not taskID or not email:
+        if not taskID:
             return Response("Bad Request", status=status.HTTP_400_BAD_REQUEST)
         task = get_object_or_404(Task, taskID=taskID)
-        user = get_object_or_404(User, email=email)
+        user = request.user
 
-        if user != task.userID:
+        if user != task.user:
             return Response("Unauthorized", status=status.HTTP_401_UNAUTHORIZED)
         if task.mode == "video":
             file_path = (
@@ -373,21 +368,25 @@ class DownloadFileAPIView(APIView):
 
 def process_task(task):
     print(f"開始處理任務：{task.taskID}")
+    status = "4"
     try:
         process_video(task)
         process_deepl(task)
-        if task.mode == "audio":
-            process_audio(task)
+        process_audio(task)
         if task.mode == "video":
-            process_audio(task)
-            # 一個function用作將mp3和mp4合成
             process_synthesis(task)
 
     except Exception as e:
+        status = "-1"
         print(f"強制結束任務：{task.taskID}, 錯誤：{str(e)}")
-    audioFilePath = (task.fileLocation).split("/")[-1].split(".")[0] + ".mp3"
-    file_paths = ["downloads/audio/" + audioFilePath, task.fileLocation]
 
+    audioFilePath = (task.fileLocation).split("/")[-1].split(".")[0] + ".mp3"
+    videoFilePath = (task.fileLocation).split("/")[-1].split(".")[0] + ".mp4"
+    file_paths = [
+        "translated/audio/" + audioFilePath,
+        task.fileLocation,
+        "translated/video/" + videoFilePath,
+    ]
     for file_path in file_paths:
         try:
             os.remove(file_path)
@@ -399,4 +398,7 @@ def process_task(task):
                 print(f"檔案正在被使用，無法刪除: {file_path}")
             else:
                 print(f"刪除檔案時發生錯誤: {file_path} - {str(e)}")
+
+    task.status = status
+    task.save()
     print(f"結束處理任務：{task.taskID}")

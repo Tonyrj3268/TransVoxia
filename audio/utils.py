@@ -8,6 +8,7 @@ from .models import Play_ht
 import os
 from pydub import AudioSegment
 from pydub.utils import mediainfo
+from django.core.files.storage import default_storage
 
 
 def process_audio(task: Task):
@@ -22,7 +23,7 @@ def process_audio(task: Task):
 
     audio_file_paths = []
     task_file_name = os.path.basename(task.fileLocation)[:-4]
-
+    print("----------開始生成聲音----------")
     for i, text_chunk in enumerate(text_chunks):
         dic = make_voice(text_chunk, voice, 100)
         url = dic["audioUrl"]
@@ -34,7 +35,7 @@ def process_audio(task: Task):
     # 將所有音訊檔案合併為一個完整的音訊檔案
     combined_audio_path = f"video-temp/{task_file_name}_complete.mp3"
     combine_audio_files(audio_file_paths, combined_audio_path)
-
+    print("----------聲音合併完成----------")
     length_ratio = round(
         get_audio_length(combined_audio_path) / float(origin_length), 3
     )
@@ -45,7 +46,7 @@ def process_audio(task: Task):
     for path in audio_file_paths:
         os.remove(path)
     os.remove(combined_audio_path)
-    combined_audio_new_path = f"downloads/audio/{task_file_name}.mp3"
+    combined_audio_new_path = f"translated/audio/{task_file_name}.mp3"
     fast_sound.export(combined_audio_new_path, format="mp3")
     Play_ht.objects.create(
         taskID=task,
@@ -54,6 +55,8 @@ def process_audio(task: Task):
         length_ratio=length_ratio,
         status=True,
     )
+    with open(combined_audio_new_path, "rb") as output_file:
+        default_storage.save(combined_audio_new_path, output_file)
     print("----------聲音生成完成----------")
     task.refresh_from_db()
     if task.status == "-1":

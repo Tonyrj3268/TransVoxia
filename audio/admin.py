@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 # Register your models here.
-from audio.models import Play_ht
+from .models import Play_ht, Play_ht_voices
 
 
 class Play_ht_Info_Admin(admin.ModelAdmin):
@@ -14,4 +14,13 @@ class Play_ht_Info_Admin(admin.ModelAdmin):
     )
 
 
+class Play_ht_voice_Info_Admin(admin.ModelAdmin):
+    list_display = (
+        "language",
+        "voice",
+        "voice_url",
+    )
+
+
 admin.site.register(Play_ht, Play_ht_Info_Admin)
+admin.site.register(Play_ht_voices, Play_ht_voice_Info_Admin)

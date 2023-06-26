@@ -21,9 +21,9 @@ from drf_yasg import openapi
 
 schema_view = get_schema_view(
     openapi.Info(
-        title="MAKABAKA API",
+        title="Trans Voxia API",
         default_version="v1",
-        description="MAKABAKA API description",
+        description="Trans Voxia API description",
         # terms_of_service="https://www.google.com/policies/terms/",
         # contact=openapi.Contact(email="contact@mysite.com"),
         # license=openapi.License(name="BSD License"),
@@ -34,6 +34,9 @@ schema_view = get_schema_view(
 urlpatterns = [
     path("", include("core.urls")),
     path("", include("chatgpt.urls")),
+    path("", include("audio.urls")),
+    path("", include("dj_rest_auth.urls")),
+    path("accounts/", include("dj_rest_auth.registration.urls")),
     path("admin/", admin.site.urls),
     re_path(
         r"^swagger(?P<format>\.json|\.yaml)$",

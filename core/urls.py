@@ -12,9 +12,9 @@ from drf_yasg import openapi
 
 schema_view = get_schema_view(
     openapi.Info(
-        title="MAKABAKA API",
+        title="Trans Voxia API",
         default_version="v1",
-        description="MAKABAKA API description",
+        description="Trans Voxia API description",
         # terms_of_service="https://www.google.com/policies/terms/",
         # contact=openapi.Contact(email="contact@mysite.com"),
         # license=openapi.License(name="BSD License"),
@@ -30,12 +30,12 @@ urlpatterns = [
         schema_view.with_ui("swagger", cache_timeout=0),
         name="schema-swagger-ui",
     ),
-    path("api/tasks/", TaskListAPIView.as_view(), name="task-list"),
-    path("api/tasks/stop/", StopTaskAPIView.as_view(), name="stop-task"),
-    path("api/tasks/change/", ChangeTaskAPIView.as_view(), name="chaneg-task"),
+    path("tasks/", TaskListAPIView.as_view(), name="task-list"),
+    path("tasks/stop/", StopTaskAPIView.as_view(), name="stop-task"),
+    path("tasks/change/", ChangeTaskAPIView.as_view(), name="chaneg-task"),
     # an api to download the task file
     path(
-        "api/tasks/download/",
+        "tasks/download/",
         DownloadFileAPIView.as_view(),
         name="download-file",
     ),

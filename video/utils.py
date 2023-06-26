@@ -1,5 +1,3 @@
-from yt_dlp import YoutubeDL
-import whisper
 import os
 import errno
 from mutagen.mp4 import MP4
@@ -31,7 +29,7 @@ def process_synthesis(task: Task):
     print("開始處理合成")
     # 讀取音頻檔案
     audioFilePath = (task.fileLocation).split("/")[-1].split(".")[0] + ".mp3"
-    audioclip = AudioFileClip("downloads/audio/" + audioFilePath)
+    audioclip = AudioFileClip("translated/audio/" + audioFilePath)
 
     # 讀取視頻檔案
     videoclip = VideoFileClip(task.fileLocation)

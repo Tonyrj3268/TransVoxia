@@ -8,7 +8,8 @@ WORKDIR /app
 COPY requirements.txt .
 
 # 安装依赖项
-RUN pip install -r requirements.txt
+RUN pip install --upgrade pip
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Install FFmpeg
 RUN apt-get update && \

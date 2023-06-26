@@ -9,4 +9,4 @@ from translator.models import Deepl
 class TaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = Task
-        exclude = ("userID",)
+        exclude = ("user",)

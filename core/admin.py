@@ -1,21 +1,11 @@
 from django.contrib import admin
-from .models import User, Task
-
-
-class User_Info_Admin(admin.ModelAdmin):
-    list_display = (
-        "userID",
-        "membership_level",
-        "expiration_date",
-        "email",
-        "password",
-    )
+from .models import Task
 
 
 class Task_Info_Admin(admin.ModelAdmin):
     list_display = (
         "taskID",
-        "userID",
+        "user",
         "title",
         "fileLocation",
         "request_time",
@@ -27,5 +17,4 @@ class Task_Info_Admin(admin.ModelAdmin):
     )
 
 
-admin.site.register(User, User_Info_Admin)
 admin.site.register(Task, Task_Info_Admin)

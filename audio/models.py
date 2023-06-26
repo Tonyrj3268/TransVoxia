@@ -9,3 +9,9 @@ class Play_ht(models.Model):
     origin_audio_url = models.URLField()
     changed_audio_url = models.URLField()
     status = models.BooleanField(default=False)
+
+
+class Play_ht_voices(models.Model):
+    language = models.CharField(max_length=30)
+    voice = models.CharField(max_length=30)
+    voice_url = models.URLField(blank=True, null=True)

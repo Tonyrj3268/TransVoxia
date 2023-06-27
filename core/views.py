@@ -25,7 +25,7 @@ import threading
 import base64
 
 # Create your views here.
-executor = ThreadPoolExecutor(max_workers=5)
+executor = ThreadPoolExecutor(max_workers=4)
 task_futures = {}
 
 
@@ -66,8 +66,11 @@ class TaskListAPIView(APIView):
         page = int(request.GET.get("page", 1))
         if request.user.is_authenticated:
             user = request.user
-            tasks = Task.objects.filter(user=user).order_by("-request_time")
-            tasks = tasks[(page - 1) * n : page * n]
+            tasks = (
+                Task.objects.filter(user=user)
+                .order_by("-request_time")
+                .select_related("transcript")[(page - 1) * n : page * n]
+            )
 
             task_results = []
             for task in tasks:
@@ -83,7 +86,7 @@ class TaskListAPIView(APIView):
         result = {"data": TaskSerializer(task).data}
         fileName = task.fileLocation.split("/")[2].split(".")[0]
         base_url = os.getenv("GOOGLE_CLOUD_STORAGE_BUCKET_OPEN_URL") + "translated/"
-        transcript = Transcript.objects.get(taskID=task).transcript
+        transcript = task.transcript.transcript
 
         result["transcript"] = transcript
         if task.mode in ["video", "audio"]:
@@ -202,8 +205,6 @@ class TaskListAPIView(APIView):
                 destination.write(chunk)
         return name
 
-
-class ChangeTaskAPIView(APIView):
     @swagger_auto_schema(
         operation_description="Change a task for a specific user.",
         responses={
@@ -244,10 +245,10 @@ class ChangeTaskAPIView(APIView):
         ],
     )
     @permission_classes([IsAuthenticated])
-    def post(self, request):
-        taskID = request.GET.get("taskID")
-        field = request.GET.get("field")
-        new_value = request.GET.get("new_value")
+    def put(self, request):
+        taskID = request.data.get("taskID")
+        field = request.data.get("field")
+        new_value = request.data.get("new_value")
 
         user = request.user
 
@@ -267,7 +268,14 @@ class ChangeTaskAPIView(APIView):
             else:
                 return Response({"error": "Invalid field."}, status=400)
 
-        return Response({"已修改": field}, status=200)
+            return Response({"已修改": field}, status=200)
+        else:
+            return Response(
+                {
+                    "error": "Forbidden: User does not have permission to access the task"
+                },
+                status=403,
+            )
 
 
 class StopTaskAPIView(APIView):
@@ -275,6 +283,8 @@ class StopTaskAPIView(APIView):
         operation_description="Stop a task for a specific user.",
         responses={
             200: "Task stopped successfully",
+            403: "Forbidden: User does not have permission to access the task",
+            404: "Not Found: Task not found or already completed",
             500: "Internal Server Error",
         },
         manual_parameters=[
@@ -301,11 +311,29 @@ class StopTaskAPIView(APIView):
             user = request.user
             task = get_object_or_404(Task, taskID=taskID)
             # 驗證操作的使用者和任務所有者相同
-            if user == task.user:
-                if task.status == "-1":
+            if user != task.user:
+                return Response({"msg": "無權限操作該任務"}, status=status.HTTP_403_FORBIDDEN)
+
+            if task.status == "-1":
+                return Response({"msg": "任務已被取消，不進行任何操作"}, status=status.HTTP_200_OK)
+
+            future = task_futures.get(task.taskID)
+            if future and not future.done():
+                if future.cancel():
+                    task.status = "-1"
+                    task.save()
+                    del task_futures[task.taskID]
+                    return Response({"msg": "任務已取消"}, status=status.HTTP_200_OK)
+                else:
                     return Response(
-                        {"msg": "任務已被取消，不進行任何操作"}, status=status.HTTP_200_OK
+                        {"msg": "無法取消任務"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
                     )
+            else:
+                return Response(
+                    {"msg": "無法找到指定的任務或任務已完成"}, status=status.HTTP_404_NOT_FOUND
+                )
+        except Http404:
+            return Response({"msg": "找不到指定的任務"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response(
                 {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR

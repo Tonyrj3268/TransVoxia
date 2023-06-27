@@ -3,8 +3,6 @@ from . import views
 from .views import (
     TaskListAPIView,
     StopTaskAPIView,
-    ChangeTaskAPIView,
-    DownloadFileAPIView,
 )
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
@@ -31,12 +29,5 @@ urlpatterns = [
         name="schema-swagger-ui",
     ),
     path("tasks/", TaskListAPIView.as_view(), name="task-list"),
-    path("tasks/stop/", StopTaskAPIView.as_view(), name="stop-task"),
-    path("tasks/change/", ChangeTaskAPIView.as_view(), name="chaneg-task"),
-    # an api to download the task file
-    path(
-        "tasks/download/",
-        DownloadFileAPIView.as_view(),
-        name="download-file",
-    ),
+    path("stop_task/<str:taskID>/", StopTaskAPIView.as_view()),
 ]

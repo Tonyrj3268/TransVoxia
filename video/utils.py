@@ -3,7 +3,8 @@ import errno
 from mutagen.mp4 import MP4
 from mutagen.mp3 import MP3
 from .models import Video, Transcript
-from core.models import Task
+from core.models import Task, TaskStatus
+from core.decorators import check_task_status
 import openai
 from moviepy.editor import VideoFileClip, AudioFileClip
 from django.core.files.storage import default_storage
@@ -11,13 +12,14 @@ from django.core.files.storage import default_storage
 # 定義與應用程式邏輯相關的工具函數（utils）
 
 
-def process_video(task: Task):
+@check_task_status
+def process_transcript(task: Task):
     if task:
         # 如果有未處理的URL，進行處理
         trans_text = generate_transcript_from_file(task)
-        store_transcript_info(task, trans_text)
+        Transcript.objects.create(taskID=task, transcript=trans_text)
         # 設置URL已處理
-        task.status = "1"
+        task.status = TaskStatus.TRANSCRIPT_COMPLETED
         task.save()
         print("結束處理url")
     else:
@@ -25,6 +27,7 @@ def process_video(task: Task):
         print("開始睡覺")
 
 
+@check_task_status
 def process_synthesis(task: Task):
     print("開始處理合成")
     # 讀取音頻檔案
@@ -60,23 +63,7 @@ def generate_transcript_from_file(task: Task):
         length = MP3(location).info.length
     print(transcript)
     print("----------文字稿已生成----------")
-    store_video_info(task, location, length)
-    return transcript["text"]
-
-
-def store_video_info(task: Task, file_location, video_length):
-    print("開始儲存影片")
-    task.refresh_from_db()
-    if task.status == "-1":
-        raise Exception("任務已被取消")
     Video.objects.create(
-        taskID=task, file_location=file_location, length=video_length, status=True
+        taskID=task, file_location=location, length=length, status=True
     )
-
-
-def store_transcript_info(task: Task, trans_text):
-    print("開始儲存文字稿")
-    task.refresh_from_db()
-    if task.status == "-1":
-        raise Exception("任務已被取消")
-    Transcript.objects.create(taskID=task, transcript=trans_text)
+    return transcript["text"]

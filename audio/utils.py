@@ -1,7 +1,7 @@
 import requests
 import json
 import time
-from core.models import Task
+from core.models import Task, TaskStatus
 from translator.models import Deepl
 from video.models import Video
 from .models import Play_ht
@@ -9,12 +9,11 @@ import os
 from pydub import AudioSegment
 from pydub.utils import mediainfo
 from django.core.files.storage import default_storage
+from core.decorators import check_task_status
 
 
+@check_task_status
 def process_audio(task: Task):
-    task.refresh_from_db()
-    if task.status == "-1":
-        raise Exception("任務已被取消")
     text = Deepl.objects.get(taskID=task).translated_text
     voice = task.voice_selection
     origin_length = Video.objects.get(taskID=task).length
@@ -58,10 +57,7 @@ def process_audio(task: Task):
     with open(combined_audio_new_path, "rb") as output_file:
         default_storage.save(combined_audio_new_path, output_file)
     print("----------聲音生成完成----------")
-    task.refresh_from_db()
-    if task.status == "-1":
-        raise Exception("任務已被取消")
-    task.status = "3"
+    task.status = TaskStatus.VOICE_GENERATION_COMPLETED
     task.save()
 
 

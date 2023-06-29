@@ -3,6 +3,7 @@ from . import views
 from .views import (
     TaskListAPIView,
     StopTaskAPIView,
+    ContinueTaskAPIView,
 )
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
@@ -30,4 +31,5 @@ urlpatterns = [
     ),
     path("tasks/", TaskListAPIView.as_view(), name="task-list"),
     path("stop_task/<str:taskID>/", StopTaskAPIView.as_view()),
+    path("continue_task/<str:taskID>/", ContinueTaskAPIView.as_view()),
 ]

@@ -13,7 +13,7 @@ class Task_Info_Admin(admin.ModelAdmin):
         "voice_selection",
         "mode",
         "status",
-        "edit_mode",
+        "needModify",
     )
 
 

@@ -23,7 +23,7 @@ class TaskWithTranscriptSerializer(serializers.ModelSerializer):
             "voice_selection",
             "mode",
             "title",
-            "edit_mode",
+            "needModify",
             "transcript",
             "mp3",
             "mp4",

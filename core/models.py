@@ -1,6 +1,17 @@
 from django.db import models
 from django.conf import settings
-import os
+from django.utils.translation import gettext_lazy as _
+
+
+class TaskStatus(models.TextChoices):
+    UNPROCESSED = "0", _("未處理")
+    TRANSCRIPT_COMPLETED = "1", _("文字稿生成完成")
+    TRANSLATION_COMPLETED = "2", _("Deepl翻譯完成")
+    VOICE_GENERATION_COMPLETED = "3", _("Play.ht語音生成完成")
+    TASK_COMPLETED = "4", _("任務完成")
+    TASK_FAILED = "-1", _("任務失敗")
+    TASK_CANCELLED = "-2", _("任務取消")
+    NA = None, _("N/A")
 
 
 class Task(models.Model):
@@ -20,14 +31,7 @@ class Task(models.Model):
 
     MODE_CHOICES = [("transcript", "逐字稿"), ("audio", "語音"), ("video", "影片")]
     mode = models.CharField(choices=MODE_CHOICES, max_length=50)
-    STATUS_CHOICES = [
-        ("0", "未處理"),
-        ("1", "文字稿生成完成"),
-        ("2", "Deepl翻譯完成"),
-        ("3", "Play.ht語音生成完成"),
-        ("4", "任務完成"),
-        ("-1", "任務失敗"),
-        (None, "N/A"),
-    ]
-    status = models.CharField(choices=STATUS_CHOICES, max_length=50)
-    edit_mode = models.BooleanField(default=False)
+    status = models.CharField(
+        choices=TaskStatus.choices, max_length=50, default=TaskStatus.UNPROCESSED
+    )
+    needModify = models.BooleanField(default=False)

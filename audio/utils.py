@@ -12,7 +12,7 @@ from django.core.files.storage import default_storage
 from core.decorators import check_task_status
 
 
-@check_task_status
+@check_task_status(TaskStatus.VOICE_PROCESSING)
 def process_audio(task: Task):
     text = Deepl.objects.get(taskID=task).translated_text
     voice = task.voice_selection
@@ -27,14 +27,17 @@ def process_audio(task: Task):
         dic = make_voice(text_chunk, voice, 100)
         url = dic["audioUrl"]
         # 下載音訊檔案並儲存到本地，然後將路徑添加到列表中
-        audio_file_path = f"video-temp/{task_file_name}_{i}.mp3"
+        audio_file_path = f"audio-temp/{task_file_name}_{i}.mp3"
         download_audio(url, audio_file_path)
         audio_file_paths.append(audio_file_path)
 
     # 將所有音訊檔案合併為一個完整的音訊檔案
-    combined_audio_path = f"video-temp/{task_file_name}_complete.mp3"
+    task.status = TaskStatus.VIDEO_MERGE_PROCESSING
+    task.save()
+    combined_audio_path = f"audio-temp/{task_file_name}_complete.mp3"
     combine_audio_files(audio_file_paths, combined_audio_path)
     print("----------聲音合併完成----------")
+
     length_ratio = round(
         get_audio_length(combined_audio_path) / float(origin_length), 3
     )
@@ -57,11 +60,9 @@ def process_audio(task: Task):
     with open(combined_audio_new_path, "rb") as output_file:
         default_storage.save(combined_audio_new_path, output_file)
     print("----------聲音生成完成----------")
-    task.status = TaskStatus.VOICE_GENERATION_COMPLETED
-    task.save()
 
 
-def make_voice(text, voice, speed):
+def make_voice(text, voice, speed=100):
     payload = json.dumps(
         {
             "voice": voice,
@@ -74,10 +75,8 @@ def make_voice(text, voice, speed):
     response = requests.request(
         "POST", "https://play.ht/api/v1/convert", headers=headers, data=payload
     )
-    print(response.json())
     id = response.json()["transcriptionId"]
     url = "https://play.ht/api/v1/articleStatus?transcriptionId=" + id
-    print("----------生成聲音中----------")
 
     i = 0
     while (dic := check_voice_make(url)) == True:

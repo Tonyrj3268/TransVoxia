@@ -2,14 +2,14 @@ from video.utils import process_transcript, process_synthesis
 from audio.utils import process_audio
 from translator.utils import process_deepl
 from .decorators import TaskCancelledException
-from .models import TaskStatus
+from .models import TaskStatus, Task
 import os
 import errno
 
 
 def process_task_notNeedModify(task):
-    print(f"開始處理任務：{task.taskID}")
-    status = TaskStatus.TASK_COMPLETED
+    print(f"任務開始：{task.taskID}")
+
     try:
         process_transcript(task)
         process_deepl(task)
@@ -17,12 +17,16 @@ def process_task_notNeedModify(task):
             process_audio(task)
             if task.mode == "video":
                 process_synthesis(task)
-
+        else:
+            task.status = TaskStatus.TASK_COMPLETED
+            task.save()
     except TaskCancelledException:
-        status = TaskStatus.TASK_CANCELLED
-        print(f"任務已被取消：{task.taskID}")
+        task.status = TaskStatus.TASK_CANCELLED
+        task.save()
+        print(f"任務取消：{task.taskID}")
     except Exception as e:
-        status = TaskStatus.TASK_FAILED
+        task.status = TaskStatus.TASK_FAILED
+        task.save()
         print(f"強制結束任務：{task.taskID}, 錯誤：{str(e)}")
     finally:
         audioFilePath = (task.fileLocation).split("/")[-1].split(".")[0] + ".mp3"
@@ -33,37 +37,30 @@ def process_task_notNeedModify(task):
             "translated/video/" + videoFilePath,
         ]
         deleteFile(file_paths)
-
-    task.status = status
-    task.save()
     print(f"結束處理任務：{task.taskID}")
 
 
 def process_task_NeedModify(task):
-    print(f"開始處理任務：{task.taskID}")
-    status = TaskStatus.TASK_COMPLETED
+    print(f"任務開始：{task.taskID}")
     try:
         process_transcript(task)
         process_deepl(task)
 
     except TaskCancelledException:
-        status = TaskStatus.TASK_CANCELLED
-        print(f"任務已被取消：{task.taskID}")
+        task.status = TaskStatus.TASK_CANCELLED
+        task.save()
+        print(f"任務取消：{task.taskID}")
     except Exception as e:
-        status = TaskStatus.TASK_CANCELLED
-        print(f"強制結束任務（生成文字稿）：{task.taskID}, 錯誤：{str(e)}")
+        task.status = TaskStatus.TASK_FAILED
+        task.save()
+        print(f"強制結束任務：{task.taskID}, 錯誤：{str(e)}")
     finally:
         file_paths = [task.fileLocation]
         deleteFile(file_paths)
 
-    task.status = status
-    task.save()
-    print(f"結束處理任務：{task.taskID}")
-
 
 def process_task_Remaining(task):
     print(f"開始處理剩餘任務：{task.taskID}")
-    status = TaskStatus.TASK_COMPLETED
     try:
         process_audio(task)
 
@@ -71,11 +68,13 @@ def process_task_Remaining(task):
             process_synthesis(task)
 
     except TaskCancelledException:
-        status = TaskStatus.TASK_CANCELLED
-        print(f"任務已被取消：{task.taskID}")
+        task.status = TaskStatus.TASK_CANCELLED
+        task.save()
+        print(f"任務取消：{task.taskID}")
     except Exception as e:
-        status = TaskStatus.TASK_FAILED
-        print(f"強制結束任務（生成文字稿）：{task.taskID}, 錯誤：{str(e)}")
+        task.status = TaskStatus.TASK_FAILED
+        task.save()
+        print(f"強制結束任務：{task.taskID}, 錯誤：{str(e)}")
     finally:
         audioFilePath = (task.fileLocation).split("/")[-1].split(".")[0] + ".mp3"
         videoFilePath = (task.fileLocation).split("/")[-1].split(".")[0] + ".mp4"
@@ -85,10 +84,9 @@ def process_task_Remaining(task):
             "translated/video/" + videoFilePath,
         ]
         deleteFile(file_paths)
-
-    task.status = status
-    task.save()
-    print(f"結束處理任務：{task.taskID}")
+        task.status = TaskStatus.TASK_COMPLETED
+        task.save()
+        print(f"結束處理任務：{task.taskID}")
 
 
 def deleteFile(file_paths):

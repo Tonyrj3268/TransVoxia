@@ -1,5 +1,4 @@
 import os
-import errno
 from mutagen.mp4 import MP4
 from mutagen.mp3 import MP3
 from .models import Video, Transcript
@@ -9,27 +8,15 @@ import openai
 from moviepy.editor import VideoFileClip, AudioFileClip
 from django.core.files.storage import default_storage
 
-# 定義與應用程式邏輯相關的工具函數（utils）
 
-
-@check_task_status
+@check_task_status(TaskStatus.TRANSCRIPT_PROCESSING)
 def process_transcript(task: Task):
-    if task:
-        # 如果有未處理的URL，進行處理
-        trans_text = generate_transcript_from_file(task)
-        Transcript.objects.create(taskID=task, transcript=trans_text)
-        # 設置URL已處理
-        task.status = TaskStatus.TRANSCRIPT_COMPLETED
-        task.save()
-        print("結束處理url")
-    else:
-        # 如果沒有未處理的URL，等待下一次啟動
-        print("開始睡覺")
+    trans_text = generate_transcript_from_file(task)
+    Transcript.objects.create(taskID=task, transcript=trans_text)
 
 
-@check_task_status
+@check_task_status(TaskStatus.VIDEO_MERGE_PROCESSING)
 def process_synthesis(task: Task):
-    print("開始處理合成")
     # 讀取音頻檔案
     audioFilePath = (task.fileLocation).split("/")[-1].split(".")[0] + ".mp3"
     audioclip = AudioFileClip("translated/audio/" + audioFilePath)

@@ -5,10 +5,12 @@ from django.utils.translation import gettext_lazy as _
 
 class TaskStatus(models.TextChoices):
     UNPROCESSED = "0", _("未處理")
-    TRANSCRIPT_COMPLETED = "1", _("文字稿生成完成")
-    TRANSLATION_COMPLETED = "2", _("Deepl翻譯完成")
-    VOICE_GENERATION_COMPLETED = "3", _("Play.ht語音生成完成")
-    TASK_COMPLETED = "4", _("任務完成")
+    TRANSCRIPT_PROCESSING = "1", _("文字稿生成中")
+    TRANSLATION_PROCESSING = "2", _("Deepl翻譯中")
+    VOICE_PROCESSING = "3", _("Play.ht語音生成中")
+    VOICE_MERGE_PROCESSING = "4", _("語音合成中")
+    VIDEO_MERGE_PROCESSING = "5", _("影片合成中")
+    TASK_COMPLETED = "6", _("任務完成")
     TASK_FAILED = "-1", _("任務失敗")
     TASK_CANCELLED = "-2", _("任務取消")
     NA = None, _("N/A")

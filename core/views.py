@@ -127,10 +127,10 @@ class TaskListAPIView(APIView):
                 required=True,
             ),
             openapi.Parameter(
-                name="editmode",
+                name="needModify",
                 in_=openapi.IN_QUERY,
                 type=openapi.TYPE_BOOLEAN,
-                description="True means the transcript is editable, False means not editable",
+                description="True means the transcript is need to modify, False means not editable",
                 required=True,
             ),
             openapi.Parameter(

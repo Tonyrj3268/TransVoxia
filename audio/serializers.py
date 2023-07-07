@@ -1,14 +1,12 @@
 from rest_framework import serializers
-from audio.models import Play_ht_voices
+from audio.models import Play_ht_voices, LanguageMapping
 
 
 # Create your serializers here.
 class LanguageSerializer(serializers.ModelSerializer):
-    language = serializers.ListField(child=serializers.CharField())
-
     class Meta:
-        model = Play_ht_voices
-        fields = ["language"]
+        model = LanguageMapping
+        fields = ["original_language", "mapped_language"]
 
 
 class PlayHtVoicesSerializer(serializers.ModelSerializer):

@@ -48,8 +48,6 @@ def generate_transcript_from_file(task: Task):
         length = MP4(location).info.length
     elif location.split(".")[-1] in ["mp3", "wav"]:
         length = MP3(location).info.length
-    print(transcript)
-    print("----------文字稿已生成----------")
     Video.objects.create(
         taskID=task, file_location=location, length=length, status=True
     )

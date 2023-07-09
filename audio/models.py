@@ -6,7 +6,6 @@ from core.models import Task
 class Play_ht(models.Model):
     taskID = models.ForeignKey(Task, on_delete=models.CASCADE)
     length_ratio = models.FloatField()
-    origin_audio_url = models.URLField()
     changed_audio_url = models.URLField()
     status = models.BooleanField(default=False)
 
@@ -28,5 +27,8 @@ class Play_ht_voices(models.Model):
         blank=True,
         null=True,
     )
-    voice = models.CharField(max_length=30)
+    voice = models.CharField(max_length=30, unique=True)
     voice_url = models.URLField(blank=True, null=True)
+
+    def __str__(self):
+        return self.voice

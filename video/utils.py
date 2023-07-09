@@ -43,7 +43,9 @@ def generate_transcript_from_file(task: Task):
     location = task.fileLocation
     openai.api_key = os.getenv("OPENAI_API_KEY")
     with open(location, "rb") as audio_file:
-        transcript = openai.Audio.transcribe("whisper-1", audio_file)
+        transcript = openai.Audio.transcribe(
+            file=audio_file, model="whisper-1", prompt=""
+        )
     if location.split(".")[-1] in ["mp4", "m4a"]:
         length = MP4(location).info.length
     elif location.split(".")[-1] in ["mp3", "wav"]:

@@ -1,0 +1,25 @@
+{
+  "break": {
+    "params": {
+      "strength": {
+        "none": "No pause. Used to eliminate default pauses.",
+        "x-weak": "Very short pause. Typically used to eliminate default pauses.",
+        "weak": "Short pause. Typically used to eliminate default pauses.",
+        "medium": "Medium-length pause. Typically used to eliminate default pauses.",
+        "strong": "Long pause. Typically used to eliminate default pauses.",
+        "x-strong": "Very long pause. Typically used to eliminate default pauses."
+      },
+      "time": "Pause duration in seconds, up to 10 seconds."
+    }
+  },
+  "p": "Indicates a paragraph. A strong pause will be inserted at the end of the paragraph for TTS speech, equivalent to <break strength='x-strong'>.",
+  "prosody": {
+    "params": {
+      "pitch": "The speaking speed of the statement, default value is 100%, indicating normal speed, 50% represents half speed, 200% represents double speed.",
+      "rate": "Increases or decreases the speaking speed by the specified percentage. 100% represents normal speed, 50% represents half speed, 200% represents double speed.",
+      "volume": "Volume adjustment in decibels (-20dB to +20dB)"
+    }
+  },
+  "s": "Indicates a sentence. A medium pause will be inserted at the end of the sentence for TTS speech, equivalent to <break strength='strong'>.",
+  "speak": "The required root tag for all SSML documents. There can only be one instance of this tag, and other tags and text should be enclosed within this tag."
+}

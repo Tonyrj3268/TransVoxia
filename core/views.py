@@ -2,20 +2,20 @@ from django.shortcuts import get_object_or_404
 from django.core.files.storage import default_storage
 from django.core.exceptions import PermissionDenied
 from django.http import Http404
-from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Prefetch
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
 from concurrent.futures import ThreadPoolExecutor
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+from rest_framework import status
+from rest_framework.views import APIView
+from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import permission_classes
 from .models import Task, TaskStatus
 from .serializers import TaskSerializer, TaskWithTranscriptSerializer
 from video.models import Transcript
+from audio.models import Play_ht_voices
 from .utils import (
     process_task_notNeedModify,
     process_task_NeedModify,
@@ -146,13 +146,16 @@ class TaskListAPIView(APIView):
     def post(self, request):
         try:
             user = request.user
+            play_ht_voice = Play_ht_voices.objects.get(
+                voice=request.GET.get("voice_selection")
+            )
             task = Task.objects.create(
                 user=user,
                 target_language=request.GET.get("target_language"),
-                voice_selection=request.GET.get("voice_selection"),
+                voice_selection=play_ht_voice,
                 mode=request.GET.get("mode"),
                 title=request.GET.get("title"),
-                needModify=request.GET.get("editmode") == "true",
+                needModify=request.GET.get("needModify") == "true",
             )
 
             file = request.FILES.get("file")
@@ -280,7 +283,7 @@ class StopTaskAPIView(APIView):
                 name="Authorization",
                 in_=openapi.IN_HEADER,
                 type=openapi.TYPE_STRING,
-                description="Bearer <JWT Token>",
+                description="User Token",
                 required=True,
             ),
         ],
@@ -330,7 +333,7 @@ class ContinueTaskAPIView(APIView):
                 name="Authorization",
                 in_=openapi.IN_HEADER,
                 type=openapi.TYPE_STRING,
-                description="Bearer <JWT Token>",
+                description="User Token",
                 required=True,
             ),
         ],

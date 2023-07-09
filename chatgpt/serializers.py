@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 
 class ChatSerializer(serializers.Serializer):
-    max_length = 200
+    max_length = 10000
     system_content = serializers.CharField(
         max_length=max_length, help_text="You are a talk show host in Taiwan."
     )

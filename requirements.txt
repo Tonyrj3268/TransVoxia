@@ -13,3 +13,4 @@ google-cloud-storage
 django-storages
 dj-rest-auth
 dj-rest-auth[with_social]
+django-allauth

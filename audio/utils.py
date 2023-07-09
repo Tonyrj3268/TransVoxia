@@ -15,14 +15,11 @@ from core.decorators import check_task_status
 @check_task_status(TaskStatus.VOICE_PROCESSING)
 def process_audio(task: Task):
     text = Deepl.objects.get(taskID=task).translated_text
-    voice = task.voice_selection
-    origin_length = Video.objects.get(taskID=task).length
-
+    voice = task.voice_selection.voice
+    task_file_name = task.get_file_basename()
     text_chunks = split_text_into_chunks(text, chunk_size=2500)
 
     audio_file_paths = []
-    task_file_name = os.path.basename(task.fileLocation)[:-4]
-    print("----------開始生成聲音----------")
     for i, text_chunk in enumerate(text_chunks):
         dic = make_voice(text_chunk, voice, 100)
         url = dic["audioUrl"]
@@ -30,13 +27,15 @@ def process_audio(task: Task):
         audio_file_path = f"audio-temp/{task_file_name}_{i}.mp3"
         download_audio(url, audio_file_path)
         audio_file_paths.append(audio_file_path)
+    return audio_file_paths
 
-    # 將所有音訊檔案合併為一個完整的音訊檔案
-    task.status = TaskStatus.VIDEO_MERGE_PROCESSING
-    task.save()
+
+@check_task_status(TaskStatus.VOICE_MERGE_PROCESSING)
+def merge_audio_and_video(task: Task, audio_file_paths: list[str]):
+    task_file_name = task.get_file_basename()
+    origin_length = Video.objects.get(taskID=task).length
     combined_audio_path = f"audio-temp/{task_file_name}_complete.mp3"
     combine_audio_files(audio_file_paths, combined_audio_path)
-    print("----------聲音合併完成----------")
 
     length_ratio = round(
         get_audio_length(combined_audio_path) / float(origin_length), 3
@@ -52,14 +51,12 @@ def process_audio(task: Task):
     fast_sound.export(combined_audio_new_path, format="mp3")
     Play_ht.objects.create(
         taskID=task,
-        origin_audio_url=url,
         changed_audio_url=combined_audio_new_path,
         length_ratio=length_ratio,
         status=True,
     )
     with open(combined_audio_new_path, "rb") as output_file:
         default_storage.save(combined_audio_new_path, output_file)
-    print("----------聲音生成完成----------")
 
 
 def make_voice(text, voice, speed=100):

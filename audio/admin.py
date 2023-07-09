@@ -9,7 +9,6 @@ class Play_ht_Info_Admin(admin.ModelAdmin):
     list_display = (
         "taskID",
         "length_ratio",
-        "origin_audio_url",
         "changed_audio_url",
         "status",
     )

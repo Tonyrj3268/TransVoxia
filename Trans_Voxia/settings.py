@@ -183,10 +183,13 @@ GOOGLE_CLOUD_STORAGE_BUCKET = storage_client.get_bucket(
 
 # dj-rest-auth
 AUTH_USER_MODEL = "accounts.CustomUser"
-ACCOUNT_AUTHENTICATION_METHOD = "username_email"
+ACCOUNT_AUTHENTICATION_METHOD = "email"
+ACCOUNT_EMAIL_REQUIRED = True
 # ACCOUNT_EMAIL_VERIFICATION = "mandatory"
 SITE_ID = 1
 AUTHENTICATION_BACKENDS = [
     # allauth specific authentication methods, such as login by e-mail
     "allauth.account.auth_backends.AuthenticationBackend",
 ]
+
+ACCOUNT_EMAIL_VERIFICATION = "none"

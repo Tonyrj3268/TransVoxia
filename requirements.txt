@@ -14,7 +14,7 @@ django-storages
 dj-rest-auth
 dj-rest-auth[with_social]
 django-allauth
-
+djangorestframework-simplejw
 google-api-core==2.11.1
 google-auth==2.20.0
 google-auth-oauthlib==1.0.0

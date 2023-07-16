@@ -1,4 +1,5 @@
 import os
+import traceback
 from mutagen.mp4 import MP4
 from mutagen.mp3 import MP3
 from .models import Video, Transcript
@@ -11,45 +12,54 @@ from django.core.files.storage import default_storage
 
 @check_task_status(TaskStatus.TRANSCRIPT_PROCESSING)
 def process_transcript(task: Task):
-    trans_text = generate_transcript_from_file(task)
-    Transcript.objects.create(taskID=task, transcript=trans_text)
+    try:
+        trans_text = generate_transcript_from_file(task)
+        Transcript.objects.create(taskID=task, transcript=trans_text)
+    except Exception as e:
+        error_message = "Failed to process transcript.\n" + traceback.format_exc()
+        raise Exception(error_message) from e
 
 
 @check_task_status(TaskStatus.VIDEO_MERGE_PROCESSING)
 def process_synthesis(task: Task):
-    # 讀取音頻檔案
-    audioFilePath = (task.fileLocation).split("/")[-1].split(".")[0] + ".mp3"
-    audioclip = AudioFileClip("translated/audio/" + audioFilePath)
-
-    # 讀取視頻檔案
-    videoclip = VideoFileClip(task.fileLocation)
-
-    # 將音頻添加到視頻檔案，替換原本的音軌
-    newVideoclip = videoclip.set_audio(audioclip)
-
-    # 將結果輸出為一個新的視頻檔案
-    output_path = (
-        "translated/video/" + (task.fileLocation).split("/")[-1].split(".")[0] + ".mp4"
-    )
-    newVideoclip.write_videofile(output_path, codec="libx264")
-    with open(output_path, "rb") as output_file:
-        default_storage.save(output_path, output_file)
-    audioclip.close()
-    videoclip.close()
-    newVideoclip.close()
+    try:
+        audioFilePath = f"{task.get_file_basename}.mp3"
+        audioclip = AudioFileClip(f"translated/audio/{audioFilePath}")
+        videoclip = VideoFileClip(task.fileLocation)
+        newVideoclip = videoclip.set_audio(audioclip)
+        output_path = f"translated/video/{task.get_file_basename}.mp4"
+        newVideoclip.write_videofile(output_path, codec="libx264")
+        with open(output_path, "rb") as output_file:
+            default_storage.save(output_path, output_file)
+        audioclip.close()
+        videoclip.close()
+        newVideoclip.close()
+    except Exception as e:
+        error_message = "Failed to process synthesis.\n" + traceback.format_exc()
+        raise Exception(error_message) from e
 
 
 def generate_transcript_from_file(task: Task):
     location = task.fileLocation
-    openai.api_key = os.getenv("OPENAI_API_KEY")
-    with open(location, "rb") as audio_file:
-        transcript = openai.Audio.transcribe(
-            file=audio_file, model="whisper-1", prompt=""
-        )
-    if location.split(".")[-1] in ["mp4", "m4a"]:
+    openai_api_key = os.getenv("OPENAI_API_KEY", None)
+    if openai_api_key is None:
+        raise Exception("OPENAI_API_KEY is not set in the environment variables.")
+    openai.api_key = openai_api_key
+    try:
+        with open(location, "rb") as audio_file:
+            transcript = openai.Audio.transcribe(
+                file=audio_file, model="whisper-1", prompt=""
+            )
+    except Exception as e:
+        error_message = "Failed to transcribe audio file.\n" + traceback.format_exc()
+        raise Exception(error_message) from e
+    extension = location.split(".")[-1]
+    if extension in ["mp4", "m4a"]:
         length = MP4(location).info.length
-    elif location.split(".")[-1] in ["mp3", "wav"]:
+    elif extension in ["mp3", "wav"]:
         length = MP3(location).info.length
+    else:
+        raise Exception(f"不支援的檔案格式：{extension}，路徑：{location}")
     Video.objects.create(
         taskID=task, file_location=location, length=length, status=True
     )

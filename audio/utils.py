@@ -81,7 +81,6 @@ def make_voice(text, voice, speed=100):
         if i > 12:
             print("請求超時")
             break
-    print(dic)
     return dic
 
 
@@ -121,7 +120,6 @@ def combine_audio_files(audio_file_paths, output_path):
 
 
 def split_text_into_chunks(text, chunk_size):
-    # 將文本分成指定大小的塊
     chunks = []
     while text:
         chunks.append(text[:chunk_size])

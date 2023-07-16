@@ -39,13 +39,6 @@ class TaskListAPIView(APIView):
         },
         manual_parameters=[
             openapi.Parameter(
-                name="Authorization",
-                in_=openapi.IN_HEADER,
-                type=openapi.TYPE_STRING,
-                description="Token",
-                required=True,
-            ),
-            openapi.Parameter(
                 "n",
                 openapi.IN_QUERY,
                 description="Number of tasks to be returned in one page",
@@ -63,22 +56,19 @@ class TaskListAPIView(APIView):
     def get(self, request):
         n = int(request.GET.get("n", 0))
         page = int(request.GET.get("page", 1))
-        if request.user.is_authenticated:
-            user = request.user
-            transcripts = Transcript.objects.filter(taskID__user=user)
-            tasks = (
-                Task.objects.filter(user=user)
-                .order_by("-request_time")
-                .prefetch_related(Prefetch("transcript_set", queryset=transcripts))[
-                    (page - 1) * n : page * n
-                ]
-            )
+        user = request.user
+        transcripts = Transcript.objects.filter(taskID__user=user)
+        tasks = (
+            Task.objects.filter(user=user)
+            .order_by("-request_time")
+            .prefetch_related(Prefetch("transcript_set", queryset=transcripts))[
+                (page - 1) * n : page * n
+            ]
+        )
 
-            serializer = TaskWithTranscriptSerializer(tasks, many=True)
+        serializer = TaskWithTranscriptSerializer(tasks, many=True)
 
-            return Response(serializer.data)
-        else:
-            raise PermissionDenied("You must be logged in to view tasks.")
+        return Response(serializer.data)
 
     @swagger_auto_schema(
         operation_description="Create a new task for a specific user.",
@@ -88,13 +78,6 @@ class TaskListAPIView(APIView):
         },
         request_body=None,
         manual_parameters=[
-            openapi.Parameter(
-                name="Authorization",
-                in_=openapi.IN_HEADER,
-                type=openapi.TYPE_STRING,
-                description="Bearer <JWT Token>",
-                required=True,
-            ),
             openapi.Parameter(
                 name="target_language",
                 in_=openapi.IN_QUERY,
@@ -205,13 +188,6 @@ class TaskListAPIView(APIView):
         },
         manual_parameters=[
             openapi.Parameter(
-                name="Authorization",
-                in_=openapi.IN_HEADER,
-                type=openapi.TYPE_STRING,
-                description="Bearer <JWT Token>",
-                required=True,
-            ),
-            openapi.Parameter(
                 name="taskID",
                 in_=openapi.IN_QUERY,
                 type=openapi.TYPE_STRING,
@@ -278,15 +254,6 @@ class StopTaskAPIView(APIView):
             404: "Not Found: Task not found or already completed",
             500: "Internal Server Error",
         },
-        manual_parameters=[
-            openapi.Parameter(
-                name="Authorization",
-                in_=openapi.IN_HEADER,
-                type=openapi.TYPE_STRING,
-                description="User Token",
-                required=True,
-            ),
-        ],
     )
     @permission_classes([IsAuthenticated])
     def post(self, request, taskID):
@@ -328,15 +295,6 @@ class ContinueTaskAPIView(APIView):
             404: "Not Found: Task not found or already completed",
             500: "Internal Server Error",
         },
-        manual_parameters=[
-            openapi.Parameter(
-                name="Authorization",
-                in_=openapi.IN_HEADER,
-                type=openapi.TYPE_STRING,
-                description="User Token",
-                required=True,
-            ),
-        ],
     )
     @permission_classes([IsAuthenticated])
     def post(self, request, taskID):

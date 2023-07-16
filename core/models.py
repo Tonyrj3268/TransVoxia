@@ -39,4 +39,7 @@ class Task(models.Model):
     needModify = models.BooleanField(default=False)
 
     def get_file_basename(self):
+        """
+        documents/my_file.txt -> my_file
+        """
         return os.path.splitext(os.path.basename(self.fileLocation))[0]

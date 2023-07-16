@@ -14,6 +14,7 @@ class TaskWithTranscriptSerializer(serializers.ModelSerializer):
     transcript = serializers.SerializerMethodField()
     mp3 = serializers.SerializerMethodField()
     mp4 = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
 
     class Meta:
         model = Task
@@ -24,10 +25,11 @@ class TaskWithTranscriptSerializer(serializers.ModelSerializer):
             "mode",
             "title",
             "needModify",
+            "status",
+            "request_time",
             "transcript",
             "mp3",
             "mp4",
-            "request_time",
         ]
 
     def get_transcript(self, obj):
@@ -49,3 +51,6 @@ class TaskWithTranscriptSerializer(serializers.ModelSerializer):
             file_path = "translated/video/" + fileName + ".mp4"
             return default_storage.url(file_path)
         return None
+
+    def get_status(self, obj):
+        return obj.get_status_display()

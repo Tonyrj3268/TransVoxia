@@ -1,0 +1,37 @@
+[tool.poetry]
+name = "transvoxia"
+version = "0.1.0"
+description = ""
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+django = "4.2.1"
+mutagen = "1.46.0"
+deepl = "^1.15.0"
+python-dotenv = "^1.0.0"
+openai = "^0.27.8"
+pydub = "^0.25.1"
+djangorestframework = "^3.14.0"
+django-rest-swagger = "^2.2.0"
+drf-yasg = "^1.21.7"
+django-cors-headers = "^4.2.0"
+moviepy = "^1.0.3"
+google-cloud-storage = "^2.10.0"
+django-storages = "^1.13.2"
+dj-rest-auth = {extras = ["with-social"], version = "^4.0.1"}
+django-allauth = "^0.54.0"
+djangorestframework-simplejwt = "^5.2.2"
+google-api-core = "^2.11.1"
+google-auth = "^2.22.0"
+google-auth-oauthlib = "^1.0.0"
+google-cloud-core = "^2.3.3"
+google-crc32c = "^1.5.0"
+google-resumable-media = "^2.5.0"
+googleapis-common-protos = "^1.59.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

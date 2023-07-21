@@ -23,11 +23,11 @@ def process_transcript(task: Task):
 @check_task_status(TaskStatus.VIDEO_MERGE_PROCESSING)
 def process_synthesis(task: Task):
     try:
-        audioFilePath = f"{task.get_file_basename}.mp3"
+        audioFilePath = f"{task.get_file_basename()}.mp3"
         audioclip = AudioFileClip(f"translated/audio/{audioFilePath}")
         videoclip = VideoFileClip(task.fileLocation)
         newVideoclip = videoclip.set_audio(audioclip)
-        output_path = f"translated/video/{task.get_file_basename}.mp4"
+        output_path = f"translated/video/{task.get_file_basename()}.mp4"
         newVideoclip.write_videofile(output_path, codec="libx264")
         with open(output_path, "rb") as output_file:
             default_storage.save(output_path, output_file)

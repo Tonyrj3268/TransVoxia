@@ -7,11 +7,16 @@ from .models import Play_ht, Play_ht_voices, LanguageMapping
 @admin.register(Play_ht)
 class Play_ht_Info_Admin(admin.ModelAdmin):
     list_display = (
-        "taskID",
+        "get_task_name",
         "length_ratio",
         "changed_audio_url",
         "status",
     )
+
+    def get_task_name(self, obj):
+        return obj.task.title if obj.task else "No Task"
+
+    get_task_name.short_description = "Task"
 
 
 @admin.register(Play_ht_voices)

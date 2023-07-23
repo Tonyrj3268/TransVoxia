@@ -24,9 +24,8 @@ def process_task_notNeedModify(task):
             merge_audio_and_video(task, audio_file_paths)
             if task.mode == "video":
                 process_synthesis(task)
-        else:
-            task.status = TaskStatus.TASK_COMPLETED
-            task.save()
+        task.status = TaskStatus.TASK_COMPLETED
+        task.save()
     print(f"結束處理任務：{task.taskID}")
 
 
@@ -37,9 +36,8 @@ def process_task_NeedModify(task):
     ]
 
     with handle_task_exceptions(task, file_paths):
-        print("開始處理翻譯")
         process_transcript(task)
-        process_deepl(task)
+
     print(f"等待編輯：{task.taskID}")
 
 
@@ -53,6 +51,7 @@ def process_task_Remaining(task):
     ]
 
     with handle_task_exceptions(task, file_paths):
+        process_deepl(task)
         audio_file_paths = process_audio(task)
         merge_audio_and_video(task, audio_file_paths)
         if task.mode == "video":

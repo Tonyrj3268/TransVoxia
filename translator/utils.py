@@ -10,10 +10,14 @@ from core.decorators import check_task_status
 @check_task_status(TaskStatus.TRANSLATION_PROCESSING)
 def process_deepl(task: Task):
     try:
-        text = Transcript.objects.get(taskID=task).transcript
+        text = task.transcript.transcript
+        if task.needModify and task.transcript.modified_transcript:
+            text = task.transcript.modified_transcript
         target_lan = task.target_language
         prompt = deepl_tanslator(text, target_lan)
-        Deepl.objects.create(taskID=task, translated_text=prompt, status=True)
+        deep = Deepl.objects.create(translated_text=prompt, status=True)
+        task.deepl = deep
+        task.save()
     except Transcript.DoesNotExist:
         error_message = (
             "Transcript for this task does not exist.\n" + traceback.format_exc()

@@ -2,8 +2,6 @@ import requests
 import json
 import time
 from core.models import Task, TaskStatus
-from translator.models import Deepl
-from video.models import Video
 from .models import Play_ht
 import os
 from pydub import AudioSegment
@@ -14,7 +12,7 @@ from core.decorators import check_task_status
 
 @check_task_status(TaskStatus.VOICE_PROCESSING)
 def process_audio(task: Task):
-    text = Deepl.objects.get(taskID=task).translated_text
+    text = task.deepl.translated_text
     voice = task.voice_selection.voice
     task_file_name = task.get_file_basename()
     text_chunks = split_text_into_chunks(text, chunk_size=2500)
@@ -33,7 +31,7 @@ def process_audio(task: Task):
 @check_task_status(TaskStatus.VOICE_MERGE_PROCESSING)
 def merge_audio_and_video(task: Task, audio_file_paths: list[str]):
     task_file_name = task.get_file_basename()
-    origin_length = Video.objects.get(taskID=task).length
+    origin_length = task.video.length
     combined_audio_path = f"audio-temp/{task_file_name}_complete.mp3"
     combine_audio_files(audio_file_paths, combined_audio_path)
 
@@ -49,12 +47,13 @@ def merge_audio_and_video(task: Task, audio_file_paths: list[str]):
     os.remove(combined_audio_path)
     combined_audio_new_path = f"translated/audio/{task_file_name}.mp3"
     fast_sound.export(combined_audio_new_path, format="mp3")
-    Play_ht.objects.create(
-        taskID=task,
+    playht = Play_ht.objects.create(
         changed_audio_url=combined_audio_new_path,
         length_ratio=length_ratio,
         status=True,
     )
+    task.playht = playht
+    task.save()
     with open(combined_audio_new_path, "rb") as output_file:
         default_storage.save(combined_audio_new_path, output_file)
 

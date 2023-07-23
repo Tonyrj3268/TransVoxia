@@ -33,10 +33,13 @@ class TaskWithTranscriptSerializer(serializers.ModelSerializer):
         ]
 
     def get_transcript(self, obj):
-        transcript = (
-            obj.transcript_set.first()
-        )  # adjust this line based on your relationship
-        return transcript.transcript if transcript else None
+        transcript = obj.transcript_set.first()
+        if transcript:
+            if transcript.modified_transcript:
+                return transcript.modified_transcript
+            else:
+                return transcript.transcript
+        return None
 
     def get_mp3(self, task):
         fileName = task.fileLocation.split("/")[2].split(".")[0]

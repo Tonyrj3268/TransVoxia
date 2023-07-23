@@ -2,6 +2,9 @@ from django.db import models
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 import os
+from video.models import Transcript, Video
+from audio.models import Play_ht
+from translator.models import Deepl
 
 
 class TaskStatus(models.TextChoices):
@@ -37,6 +40,11 @@ class Task(models.Model):
         choices=TaskStatus.choices, max_length=50, default=TaskStatus.UNPROCESSED
     )
     needModify = models.BooleanField(default=False)
+
+    transcript = models.OneToOneField(Transcript, on_delete=models.CASCADE, null=True)
+    video = models.OneToOneField(Video, on_delete=models.CASCADE, null=True)
+    deepl = models.OneToOneField(Deepl, on_delete=models.CASCADE, null=True)
+    playht = models.OneToOneField(Play_ht, on_delete=models.CASCADE, null=True)
 
     def get_file_basename(self):
         """

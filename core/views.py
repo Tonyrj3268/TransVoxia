@@ -22,6 +22,7 @@ from .utils import (
     process_task_Remaining,
 )
 import os
+from accounts.models import CustomUser
 
 # Create your views here.
 executor = ThreadPoolExecutor(max_workers=4)
@@ -52,11 +53,12 @@ class TaskListAPIView(APIView):
             ),
         ],
     )
-    @permission_classes([IsAuthenticated])
+    # @permission_classes([IsAuthenticated])
     def get(self, request):
         n = int(request.GET.get("n", 0))
         page = int(request.GET.get("page", 1))
-        user = request.user
+        # user = request.user
+        user = CustomUser.objects.get(username="root")
         transcripts = Transcript.objects.filter(taskID__user=user)
         tasks = (
             Task.objects.filter(user=user)
@@ -125,10 +127,11 @@ class TaskListAPIView(APIView):
             ),
         ],
     )
-    @permission_classes([IsAuthenticated])
+    # @permission_classes([IsAuthenticated])
     def post(self, request):
         try:
-            user = request.user
+            # user = request.user
+            user = CustomUser.objects.get(username="root")
             play_ht_voice = Play_ht_voices.objects.get(
                 voice=request.GET.get("voice_selection")
             )
@@ -211,13 +214,14 @@ class TaskListAPIView(APIView):
             ),
         ],
     )
-    @permission_classes([IsAuthenticated])
+    # @permission_classes([IsAuthenticated])
     def put(self, request):
         taskID = request.GET.get("taskID")
         field = request.GET.get("field")
         new_value = request.GET.get("new_value")
 
-        user = request.user
+        # user = request.user
+        user = CustomUser.objects.get(username="root")
 
         try:
             task = Task.objects.get(taskID=taskID)
@@ -227,14 +231,12 @@ class TaskListAPIView(APIView):
         if user == task.user:
             if field == "title":
                 task.title = new_value
-                task.save()
-            elif field == "transcript":
+            elif field == "transcript" and task.needModify:
                 tran = get_object_or_404(Transcript, taskID=task)
-                tran.transcript = new_value
-                tran.save()
+                tran.modified_transcript = new_value
             else:
                 return Response({"error": "Invalid field."}, status=400)
-
+            tran.save()
             return Response({"已修改": field}, status=200)
         else:
             return Response(
@@ -255,10 +257,11 @@ class StopTaskAPIView(APIView):
             500: "Internal Server Error",
         },
     )
-    @permission_classes([IsAuthenticated])
+    # @permission_classes([IsAuthenticated])
     def post(self, request, taskID):
         try:
-            user = request.user
+            # user = request.user
+            user = CustomUser.objects.get(username="root")
             task = get_object_or_404(Task, taskID=taskID)
             # 驗證操作的使用者和任務所有者相同
             if user != task.user:
@@ -291,15 +294,17 @@ class ContinueTaskAPIView(APIView):
         operation_description="Continue a task for a specific user.",
         responses={
             200: "Task Continue successfully",
-            403: "Forbidden: User does not have permission to access the task",
+            403: "Forbidden: CustomUser does not have permission to access the task",
             404: "Not Found: Task not found or already completed",
             500: "Internal Server Error",
         },
     )
-    @permission_classes([IsAuthenticated])
+    # @permission_classes([IsAuthenticated])
     def post(self, request, taskID):
         try:
-            user = request.user
+            # user = request.user
+            user = CustomUser.objects.get(username="root")
+
             task = get_object_or_404(Task, taskID=taskID)
             # 驗證操作的使用者和任務所有者相同
             if user != task.user:

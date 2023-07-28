@@ -33,7 +33,7 @@ class TaskWithTranscriptSerializer(serializers.ModelSerializer):
         ]
 
     def get_transcript(self, obj):
-        transcript = obj.transcript_set.first()
+        transcript = obj.transcript
         if transcript:
             if transcript.modified_transcript:
                 return transcript.modified_transcript

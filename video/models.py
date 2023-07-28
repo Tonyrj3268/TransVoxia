@@ -7,7 +7,17 @@ class Video(models.Model):
     upload_time = models.DateTimeField(auto_now_add=True)
     status = models.BooleanField(default=False)
 
+    def get_task_name(self) -> str:
+        return self.task.title if self.task else "No Task"
+
+    get_task_name.short_description = "Task"  # type: ignore
+
 
 class Transcript(models.Model):
     transcript = models.TextField(blank=True, null=True)
     modified_transcript = models.TextField(blank=True, null=True)
+
+    def get_task_name(self) -> str:
+        return self.task.title if self.task else "No Task"
+
+    get_task_name.short_description = "Task"  # type: ignore

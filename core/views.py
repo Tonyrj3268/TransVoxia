@@ -1,6 +1,5 @@
 from django.shortcuts import get_object_or_404
 from django.core.files.storage import default_storage
-from django.core.exceptions import PermissionDenied
 from django.http import Http404
 from django.db.models import Prefetch
 from concurrent.futures import ThreadPoolExecutor
@@ -10,8 +9,6 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.decorators import permission_classes
 from .models import Task, TaskStatus
 from .serializers import TaskSerializer, TaskWithTranscriptSerializer
 from video.models import Transcript
@@ -23,14 +20,19 @@ from .utils import (
 )
 import os
 from accounts.models import CustomUser
+from rest_framework.pagination import PageNumberPagination
+from typing import Dict
 
 # Create your views here.
 executor = ThreadPoolExecutor(max_workers=4)
-task_futures = {}
+task_futures: Dict[int, ThreadPoolExecutor] = {}
 
 
 class TaskListAPIView(APIView):
     parser_classes = (MultiPartParser,)
+
+    class CustomPagination(PageNumberPagination):
+        page_size_query_param = "n"
 
     @swagger_auto_schema(
         operation_description="Get a list of tasks for a specific user.",
@@ -53,24 +55,21 @@ class TaskListAPIView(APIView):
             ),
         ],
     )
-    # @permission_classes([IsAuthenticated])
     def get(self, request):
-        n = int(request.GET.get("n", 0))
-        page = int(request.GET.get("page", 1))
-        # user = request.user
         user = CustomUser.objects.get(username="root")
-        transcripts = Transcript.objects.filter(taskID__user=user)
+        transcripts = Transcript.objects.filter(task__user=user)
+
         tasks = (
             Task.objects.filter(user=user)
             .order_by("-request_time")
-            .prefetch_related(Prefetch("transcript_set", queryset=transcripts))[
-                (page - 1) * n : page * n
-            ]
+            .prefetch_related(Prefetch("transcript", queryset=transcripts))
         )
+        paginator = self.CustomPagination()
+        result_page = paginator.paginate_queryset(tasks, request)
 
-        serializer = TaskWithTranscriptSerializer(tasks, many=True)
+        serializer = TaskWithTranscriptSerializer(result_page, many=True)
 
-        return Response(serializer.data)
+        return paginator.get_paginated_response(serializer.data)
 
     @swagger_auto_schema(
         operation_description="Create a new task for a specific user.",
@@ -127,24 +126,32 @@ class TaskListAPIView(APIView):
             ),
         ],
     )
-    # @permission_classes([IsAuthenticated])
     def post(self, request):
         try:
-            # user = request.user
+            target_language = request.GET.get("target_language")
+            voice_selection = request.GET.get("voice_selection")
+            mode = request.GET.get("mode")
+            title = request.GET.get("title")
+            needModify = request.GET.get("needModify")
+            file = request.FILES.get("file")
+
+            if not all(
+                [target_language, voice_selection, mode, title, needModify, file]
+            ):
+                return Response(
+                    {"error": "缺少必要的參數"}, status=status.HTTP_400_BAD_REQUEST
+                )
             user = CustomUser.objects.get(username="root")
-            play_ht_voice = Play_ht_voices.objects.get(
-                voice=request.GET.get("voice_selection")
-            )
+            play_ht_voice = Play_ht_voices.objects.get(voice=voice_selection)
             task = Task.objects.create(
                 user=user,
-                target_language=request.GET.get("target_language"),
+                target_language=target_language,
                 voice_selection=play_ht_voice,
-                mode=request.GET.get("mode"),
-                title=request.GET.get("title"),
-                needModify=request.GET.get("needModify") == "true",
+                mode=mode,
+                title=title,
+                needModify=needModify == "true",
             )
 
-            file = request.FILES.get("file")
             if file:
                 _, file_extension = os.path.splitext(file.name)
                 if file_extension in [".mp4", ".mov"]:
@@ -219,10 +226,12 @@ class TaskListAPIView(APIView):
         taskID = request.GET.get("taskID")
         field = request.GET.get("field")
         new_value = request.GET.get("new_value")
-
-        # user = request.user
         user = CustomUser.objects.get(username="root")
-
+        if not all([taskID, field, new_value]):
+            return Response(
+                {"error": "Missing required fields."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         try:
             task = Task.objects.get(taskID=taskID)
         except Task.DoesNotExist:
@@ -263,7 +272,6 @@ class StopTaskAPIView(APIView):
             # user = request.user
             user = CustomUser.objects.get(username="root")
             task = get_object_or_404(Task, taskID=taskID)
-            # 驗證操作的使用者和任務所有者相同
             if user != task.user:
                 return Response({"msg": "無權限操作該任務"}, status=status.HTTP_403_FORBIDDEN)
 
@@ -299,14 +307,10 @@ class ContinueTaskAPIView(APIView):
             500: "Internal Server Error",
         },
     )
-    # @permission_classes([IsAuthenticated])
     def post(self, request, taskID):
         try:
-            # user = request.user
             user = CustomUser.objects.get(username="root")
-
             task = get_object_or_404(Task, taskID=taskID)
-            # 驗證操作的使用者和任務所有者相同
             if user != task.user:
                 return Response({"msg": "無權限操作該任務"}, status=status.HTTP_403_FORBIDDEN)
 
@@ -315,28 +319,20 @@ class ContinueTaskAPIView(APIView):
 
             if not task.needModify:
                 return Response({"msg": "任務不需要編輯，不進行任何操作"}, status=status.HTTP_200_OK)
-            else:
-                try:
-                    self.handle_file(task.fileLocation)
-                except Exception as e:
-                    return Response(
-                        {"msg": f"處理文件時發生錯誤: {str(e)}"},
-                        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    )
 
-                try:
-                    future = executor.submit(process_task_Remaining, task)
-                    task_futures[task.taskID] = future
-                except Exception as e:
-                    return Response(
-                        {"msg": f"啟動任務時發生錯誤: {str(e)}"},
-                        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    )
-            # 若成功處理文件並啟動任務
+            self.handle_file(task.fileLocation)
+            future = executor.submit(process_task_Remaining, task)
+            task_futures[task.taskID] = future
+
             return Response({"msg": "任務已開始處理"}, status=status.HTTP_200_OK)
 
         except Http404:
             return Response({"msg": "找不到指定的任務"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response(
+                {"msg": f"處理文件時發生錯誤: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
     @staticmethod
     def handle_file(fileLocation):

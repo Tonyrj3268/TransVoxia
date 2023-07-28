@@ -15,6 +15,20 @@ class Task_Info_Admin(admin.ModelAdmin):
         "status",
         "needModify",
     )
+    readonly_fields = (
+        "user",
+        "fileLocation",
+        "request_time",
+        "target_language",
+        "voice_selection",
+        "mode",
+        "status",
+        "needModify",
+        "transcript",
+        "video",
+        "deepl",
+        "playht",
+    )
 
 
 admin.site.register(Task, Task_Info_Admin)

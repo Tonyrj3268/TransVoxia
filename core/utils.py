@@ -37,8 +37,8 @@ def process_task_NeedModify(task):
 
     with handle_task_exceptions(task, file_paths):
         process_transcript(task)
-
-    print(f"等待編輯：{task.taskID}")
+    task.status = TaskStatus.TASK_STOPPED
+    task.save()
 
 
 def process_task_Remaining(task):

@@ -16,7 +16,7 @@ class Play_ht_Info_Admin(admin.ModelAdmin):
     def get_task_name(self, obj):
         return obj.task.title if obj.task else "No Task"
 
-    get_task_name.short_description = "Task"
+    get_task_name.short_description = "Task"  # type: ignore
 
 
 @admin.register(Play_ht_voices)

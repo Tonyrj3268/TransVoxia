@@ -1,7 +1,25 @@
 from rest_framework import serializers
 
-from core.models import Task
+from core.models import Task, TaskStatus
 from django.core.files.storage import default_storage
+
+TRANSCRIPT_STATUS_MAP = {
+    TaskStatus.TRANSLATION_PROCESSING: True,
+    TaskStatus.VOICE_PROCESSING: True,
+    TaskStatus.VOICE_MERGE_PROCESSING: True,
+    TaskStatus.TRANSCRIPT_PROCESSING: True,
+    TaskStatus.TASK_STOPPED: True,
+    TaskStatus.VIDEO_MERGE_PROCESSING: True,
+    TaskStatus.TASK_COMPLETED: True,
+}
+MP3_STATUS_MAP = {
+    TaskStatus.VIDEO_MERGE_PROCESSING: True,
+    TaskStatus.TASK_COMPLETED: True,
+}
+
+MP4_STATUS_MAP = {
+    TaskStatus.TASK_COMPLETED: True,
+}
 
 
 class TaskSerializer(serializers.ModelSerializer):
@@ -33,6 +51,8 @@ class TaskWithTranscriptSerializer(serializers.ModelSerializer):
         ]
 
     def get_transcript(self, obj):
+        if not self.should_return_url(obj, TRANSCRIPT_STATUS_MAP):
+            return None
         transcript = obj.transcript
         if transcript:
             if transcript.modified_transcript:
@@ -42,18 +62,25 @@ class TaskWithTranscriptSerializer(serializers.ModelSerializer):
         return None
 
     def get_mp3(self, task):
-        fileName = task.fileLocation.split("/")[2].split(".")[0]
+        if not self.should_return_url(task, MP3_STATUS_MAP):
+            return None
+        fileName = task.get_file_basename()
         if task.mode in ["video", "audio"]:
             file_path = "translated/audio/" + fileName + ".mp3"
             return default_storage.url(file_path)
         return None
 
     def get_mp4(self, task):
-        fileName = task.fileLocation.split("/")[2].split(".")[0]
+        if not self.should_return_url(task, MP4_STATUS_MAP):
+            return None
+        fileName = task.get_file_basename()
         if task.mode == "video":
             file_path = "translated/video/" + fileName + ".mp4"
             return default_storage.url(file_path)
         return None
 
-    def get_status(self, obj):
-        return obj.get_status_display()
+    def get_status(self, task):
+        return task.get_status_display()
+
+    def should_return_url(self, task, status_map):
+        return task.status in status_map and status_map[task.status]

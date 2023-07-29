@@ -73,6 +73,11 @@ MIDDLEWARE = [
 
 CORS_ORIGIN_ALLOW_ALL = True
 
+# CSRF_TRUSTED_ORIGINS = ["https://trans-voxia-wnmw2c6jqa-de.a.run.app"]
+
+# SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SECURE_SSL_REDIRECT = False
+
 ROOT_URLCONF = "Trans_Voxia.urls"
 
 TEMPLATES = [
@@ -141,11 +146,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.1/howto/static-files/
 
 STATIC_URL = "/static/"
-
-STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
-
-# STATIC_ROOT = os.path.join(BASE_DIR, 'assets')
-STATIC_ROOT = BASE_DIR / "staticfiles"  # <-- Updated!
+STATIC_ROOT = os.path.join(BASE_DIR, "static")
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
@@ -167,11 +168,9 @@ REST_AUTH = {
     "JWT_AUTH_COOKIE": "transvoxia-auth",
     "JWT_AUTH_REFRESH_COOKIE": "transvoxia-refresh-token",
 }
-SWAGGER_SETTINGS = {
-    "DEFAULT_AUTHENTICATION_CLASSES": [
-        "dj_rest_auth.jwt_auth.JWTCookieAuthentication",
-    ],
-}
+# SWAGGER_SETTINGS = {
+#     "DEFAULT_API_URL": "https://trans-voxia-wnmw2c6jqa-de.a.run.app/",
+# }
 
 
 from google.cloud import storage

@@ -31,10 +31,12 @@ def process_synthesis(task: Task) -> None:
         ) as audioclip, VideoFileClip(task.fileLocation) as videoclip:
             newVideoclip = videoclip.set_audio(audioclip)
             output_path = f"translated/video/{task.get_file_basename()}.mp4"
-            newVideoclip.write_videofile(output_path, codec="libx264")
-            with open(output_path, "rb") as output_file:
-                default_storage.save(output_path, output_file)
-            newVideoclip.close()
+            newVideoclip.write_videofile(
+                output_path, codec="libx264", audio_codec="aac"
+            )
+        with open(output_path, "rb") as output_file:
+            default_storage.save(output_path, output_file)
+        newVideoclip.close()
     except Exception as e:
         error_message = "Failed to process synthesis.\n" + traceback.format_exc()
         raise Exception(error_message) from e

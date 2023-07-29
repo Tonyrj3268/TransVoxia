@@ -18,18 +18,18 @@ from django.urls import path, include, re_path
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
+from django.conf import settings
+from django.views.static import serve
 
 schema_view = get_schema_view(
     openapi.Info(
         title="Trans Voxia API",
         default_version="v1",
         description="Trans Voxia API description",
-        # terms_of_service="https://www.google.com/policies/terms/",
-        # contact=openapi.Contact(email="contact@mysite.com"),
-        # license=openapi.License(name="BSD License"),
     ),
     public=True,
     permission_classes=(permissions.AllowAny,),
+    # url="https://trans-voxia-wnmw2c6jqa-de.a.run.app/",
 )
 urlpatterns = [
     path("", include("core.urls")),
@@ -48,4 +48,5 @@ urlpatterns = [
         schema_view.with_ui("swagger", cache_timeout=0),
         name="schema-swagger-ui",
     ),
+    re_path(r"^static/(?P<path>.*)$", serve, {"document_root": settings.STATIC_ROOT}),
 ]

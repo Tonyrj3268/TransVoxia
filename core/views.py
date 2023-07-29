@@ -22,6 +22,7 @@ import os
 from accounts.models import CustomUser
 from rest_framework.pagination import PageNumberPagination
 from typing import Dict
+from django.db import connection
 
 # Create your views here.
 executor = ThreadPoolExecutor(max_workers=4)
@@ -56,6 +57,7 @@ class TaskListAPIView(APIView):
         ],
     )
     def get(self, request):
+        connection.queries.clear()
         user = CustomUser.objects.get(username="root")
         transcripts = Transcript.objects.filter(task__user=user)
 
@@ -92,7 +94,7 @@ class TaskListAPIView(APIView):
                 in_=openapi.IN_QUERY,
                 type=openapi.TYPE_STRING,
                 description="Voice Selection",
-                enum=["ko-KR-Standard-A", "larry", "zh-TW-YunJheNeural"],
+                enum=["ko-KR-Standard-B", "Anna", "zh-TW-HsiaoChenNeural"],
                 required=True,
             ),
             openapi.Parameter(

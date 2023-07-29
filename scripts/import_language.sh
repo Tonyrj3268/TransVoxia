@@ -6,4 +6,4 @@
 
 # FIXME: add sample data for deveopment
 python manage.py import_language_mapping language/language.csv
-
+python manage.py import_voices language/voices.csv

@@ -28,11 +28,9 @@ class Task(models.Model):
     fileLocation = models.CharField(max_length=255, blank=True)
     request_time = models.DateTimeField(auto_now_add=True)
     target_language = models.CharField(max_length=255)
-    voice_selection = models.ForeignKey(
-        "audio.Play_ht_voices",
-        on_delete=models.CASCADE,
-        to_field="voice",
-        related_name="tasks",
+    voice_selection = models.TextField(
+        null=True,
+        blank=True
     )
 
     MODE_CHOICES = [("transcript", "逐字稿"), ("audio", "語音"), ("video", "影片")]

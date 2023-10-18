@@ -12,7 +12,7 @@ from rest_framework.parsers import MultiPartParser
 from .models import Task, TaskStatus
 from .serializers import TaskSerializer, TaskWithTranscriptSerializer
 from video.models import Transcript
-from audio.models import Play_ht_voices
+from audio.models import Play_ht_voices, LanguageMapping
 from .utils import (
     process_task_notNeedModify,
     process_task_NeedModify,
@@ -23,10 +23,37 @@ from accounts.models import CustomUser
 from rest_framework.pagination import PageNumberPagination
 from typing import Dict
 from django.db import connection
-
+import json
 # Create your views here.
 executor = ThreadPoolExecutor(max_workers=4)
 task_futures: Dict[int, ThreadPoolExecutor] = {}
+
+
+def get_dynamic_swagger_params():
+    # 從資料庫取得所有可用的語言和聲音
+    # available_languages = LanguageMapping.objects.values_list(
+    #     "original_language", flat=True
+    # )
+    available_languages=[]
+    available_voices = Play_ht_voices.objects.values_list("voice", flat=True)
+    target_language_param = openapi.Parameter(
+        name="target_language",
+        in_=openapi.IN_QUERY,
+        type=openapi.TYPE_STRING,
+        description="Target Language",
+        enum=list(available_languages),
+        required=True,
+    )
+    # voice_selection_param = openapi.Parameter(
+    #     name="voice_selection",
+    #     in_=openapi.IN_QUERY,
+    #     type=openapi.TYPE_STRING,
+    #     description="Voice Selection",
+    #     enum=list(available_voices),
+    #     required=True,
+    # )
+
+    return [target_language_param]
 
 
 class TaskListAPIView(APIView):
@@ -81,22 +108,7 @@ class TaskListAPIView(APIView):
         },
         request_body=None,
         manual_parameters=[
-            openapi.Parameter(
-                name="target_language",
-                in_=openapi.IN_QUERY,
-                type=openapi.TYPE_STRING,
-                description="Target Language",
-                enum=["KO", "EN-US", "ZH"],
-                required=True,
-            ),
-            openapi.Parameter(
-                name="voice_selection",
-                in_=openapi.IN_QUERY,
-                type=openapi.TYPE_STRING,
-                description="Voice Selection",
-                enum=["ko-KR-Standard-B", "Anna", "zh-TW-HsiaoChenNeural"],
-                required=True,
-            ),
+            *get_dynamic_swagger_params(),
             openapi.Parameter(
                 name="mode",
                 in_=openapi.IN_QUERY,
@@ -113,13 +125,6 @@ class TaskListAPIView(APIView):
                 required=True,
             ),
             openapi.Parameter(
-                name="needModify",
-                in_=openapi.IN_QUERY,
-                type=openapi.TYPE_BOOLEAN,
-                description="True means the transcript is need to modify, False means not editable",
-                required=True,
-            ),
-            openapi.Parameter(
                 name="file",
                 in_=openapi.IN_FORM,
                 type=openapi.TYPE_FILE,
@@ -131,27 +136,23 @@ class TaskListAPIView(APIView):
     def post(self, request):
         try:
             target_language = request.GET.get("target_language")
-            voice_selection = request.GET.get("voice_selection")
             mode = request.GET.get("mode")
             title = request.GET.get("title")
-            needModify = request.GET.get("needModify")
             file = request.FILES.get("file")
 
             if not all(
-                [target_language, voice_selection, mode, title, needModify, file]
+                [target_language, mode, title, file]
             ):
                 return Response(
                     {"error": "缺少必要的參數"}, status=status.HTTP_400_BAD_REQUEST
                 )
             user = CustomUser.objects.get(username="root")
-            play_ht_voice = Play_ht_voices.objects.get(voice=voice_selection)
             task = Task.objects.create(
                 user=user,
                 target_language=target_language,
-                voice_selection=play_ht_voice,
                 mode=mode,
                 title=title,
-                needModify=needModify == "true",
+                needModify=True,
             )
 
             if file:
@@ -235,27 +236,19 @@ class TaskListAPIView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         try:
-            task = Task.objects.get(taskID=taskID)
+            task = Task.objects.get(taskID=taskID, user=user)
         except Task.DoesNotExist:
             return Response({"error": "Task not found."}, status=404)
 
-        if user == task.user:
-            if field == "title":
-                task.title = new_value
-            elif field == "transcript" and task.needModify:
-                tran = get_object_or_404(Transcript, taskID=task)
-                tran.modified_transcript = new_value
-            else:
-                return Response({"error": "Invalid field."}, status=400)
-            tran.save()
-            return Response({"已修改": field}, status=200)
+        if field == "title":
+            task.title = new_value
+            task.save()
+        elif field == "transcript" and task.needModify:
+            task.transcript.modified_transcript = new_value
+            task.transcript.save()
         else:
-            return Response(
-                {
-                    "error": "Forbidden: User does not have permission to access the task"
-                },
-                status=403,
-            )
+            return Response({"error": "Invalid field."}, status=400)
+        return Response({"已修改": field}, status=200)
 
 
 class StopTaskAPIView(APIView):
@@ -308,9 +301,37 @@ class ContinueTaskAPIView(APIView):
             404: "Not Found: Task not found or already completed",
             500: "Internal Server Error",
         },
+         manual_parameters=[
+            openapi.Parameter(
+                name="new_transcript",
+                in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                required=True,
+            ),
+            openapi.Parameter(
+                name="voice_list",
+                in_=openapi.IN_QUERY,
+                type=openapi.TYPE_ARRAY,
+                items=openapi.Items(type=openapi.TYPE_STRING),
+                collectionFormat='multi',
+                required=True,
+            ),
+         ]
+    
     )
     def post(self, request, taskID):
         try:
+            data = json.loads(request.body)
+            new_transcript = data.get('new_transcript', [])
+            voice_list = data.get('voice_list', [])
+            voice_list = [
+                "zh-CN-YunxiNeural",
+                "zh-CN-XiaoxiaoNeural",
+                "zh-CN-YunyangNeural",
+            ]
+            print(new_transcript)
+            print(voice_list)
+            # return Response({"msg": "任務已開始處理"}, status=status.HTTP_200_OK)
             user = CustomUser.objects.get(username="root")
             task = get_object_or_404(Task, taskID=taskID)
             if user != task.user:
@@ -323,7 +344,7 @@ class ContinueTaskAPIView(APIView):
                 return Response({"msg": "任務不需要編輯，不進行任何操作"}, status=status.HTTP_200_OK)
 
             self.handle_file(task.fileLocation)
-            future = executor.submit(process_task_Remaining, task)
+            future = executor.submit(process_task_Remaining, task,voice_list=voice_list)
             task_futures[task.taskID] = future
 
             return Response({"msg": "任務已開始處理"}, status=status.HTTP_200_OK)

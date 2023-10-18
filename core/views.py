@@ -31,10 +31,9 @@ task_futures: Dict[int, ThreadPoolExecutor] = {}
 
 def get_dynamic_swagger_params():
     # 從資料庫取得所有可用的語言和聲音
-    # available_languages = LanguageMapping.objects.values_list(
-    #     "original_language", flat=True
-    # )
-    available_languages=[]
+    available_languages = LanguageMapping.objects.values_list(
+        "original_language", flat=True
+    )
     available_voices = Play_ht_voices.objects.values_list("voice", flat=True)
     target_language_param = openapi.Parameter(
         name="target_language",
@@ -329,9 +328,6 @@ class ContinueTaskAPIView(APIView):
                 "zh-CN-XiaoxiaoNeural",
                 "zh-CN-YunyangNeural",
             ]
-            print(new_transcript)
-            print(voice_list)
-            # return Response({"msg": "任務已開始處理"}, status=status.HTTP_200_OK)
             user = CustomUser.objects.get(username="root")
             task = get_object_or_404(Task, taskID=taskID)
             if user != task.user:
@@ -348,7 +344,6 @@ class ContinueTaskAPIView(APIView):
             task_futures[task.taskID] = future
 
             return Response({"msg": "任務已開始處理"}, status=status.HTTP_200_OK)
-
         except Http404:
             return Response({"msg": "找不到指定的任務"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:

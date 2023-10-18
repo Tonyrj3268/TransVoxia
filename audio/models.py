@@ -3,7 +3,6 @@ from django.db import models
 
 # Create your models here.
 class Play_ht(models.Model):
-    length_ratio = models.FloatField()
     changed_audio_url = models.URLField()
     status = models.BooleanField(default=False)
 

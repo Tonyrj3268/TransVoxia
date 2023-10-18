@@ -8,7 +8,6 @@ from .models import Play_ht, Play_ht_voices, LanguageMapping
 class Play_ht_Info_Admin(admin.ModelAdmin):
     list_display = (
         "get_task_name",
-        "length_ratio",
         "changed_audio_url",
         "status",
     )

@@ -3,7 +3,7 @@ from django.db import models
 
 # Create your models here.
 class Deepl(models.Model):
-    translated_text = models.TextField()
+    translated_text = models.JSONField()
     status = models.BooleanField(default=False)
 
     def get_task_name(self) -> str:

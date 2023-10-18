@@ -8,24 +8,48 @@ from pydub import AudioSegment
 from pydub.utils import mediainfo
 from django.core.files.storage import default_storage
 from core.decorators import check_task_status
+import asyncio
+import aiohttp
+from aiofiles import open as aio_open
+import re
 
 
 @check_task_status(TaskStatus.VOICE_PROCESSING)
-def process_audio(task: Task):
-    text = task.deepl.translated_text
-    voice = task.voice_selection.voice
+async def process_audio(task: Task,voice_list:list[str]):
+    text = task.deepl.translated_text  # JsonField
     task_file_name = task.get_file_basename()
-    text_chunks = split_text_into_chunks(text, chunk_size=2500)
-
+    # text_chunks = split_text_into_chunks(text, chunk_size=2500)
+    ssml_list = get_ssml(text)
     audio_file_paths = []
-    for i, text_chunk in enumerate(text_chunks):
-        dic = make_voice(text_chunk, voice, 100)
-        url = dic["audioUrl"]
-        # 下載音訊檔案並儲存到本地，然後將路徑添加到列表中
-        audio_file_path = f"audio-temp/{task_file_name}_{i}.mp3"
-        download_audio(url, audio_file_path)
-        audio_file_paths.append(audio_file_path)
+    async with aiohttp.ClientSession() as session:
+        tasks = []
+        for ssml,voice in zip(ssml_list,voice_list):
+            task = asyncio.ensure_future(make_voice_async(session, ssml, voice))
+            tasks.append(task)
+
+        responses = await asyncio.gather(*tasks)
+
+        download_tasks = []
+        for i, dic in enumerate(responses):
+            url = dic["audioUrl"]
+            audio_file_path = f"audio-temp/{task_file_name}_{i}.mp3"
+            download_task = asyncio.ensure_future(
+                download_audio_async(session, url, audio_file_path)
+            )
+            download_tasks.append(download_task)
+            audio_file_paths.append(audio_file_path)
+
+        await asyncio.gather(*download_tasks)
     return audio_file_paths
+
+    # for i, text_chunk in enumerate(text_chunks):
+    #     dic = make_voice(text_chunk, voice, 100)
+    #     url = dic["audioUrl"]
+    #     # 下載音訊檔案並儲存到本地，然後將路徑添加到列表中
+    #     audio_file_path = f"audio-temp/{task_file_name}_{i}.mp3"
+    #     download_audio(url, audio_file_path)
+    #     audio_file_paths.append(audio_file_path)
+    # return audio_file_paths
 
 
 @check_task_status(TaskStatus.VOICE_MERGE_PROCESSING)
@@ -132,13 +156,90 @@ def get_audio_length(audio_path):
 
 
 def speed_change(sound, speed=1.0):
-    # Manually override the frame_rate. This tells the computer how many
-    # samples to play per second
     sound_with_altered_frame_rate = sound._spawn(
         sound.raw_data, overrides={"frame_rate": int(sound.frame_rate * speed)}
     )
-
-    # convert the sound with altered frame rate to a standard frame rate
-    # so that regular playback programs will work right. They often only
-    # know how to play audio at standard frame rate
     return sound_with_altered_frame_rate.set_frame_rate(sound.frame_rate)
+
+
+async def make_voice_async(session, text, voice, speed=100):
+    pattern = re.compile(r"(<speak>.*?</speak>)", re.DOTALL)
+    speaks = pattern.findall(text)
+    ssml = [speak.replace("\n", "").strip() for speak in speaks]
+
+    payload = {
+        "voice": voice,
+        "content": ssml,
+        "title": "Testing public api conversion",
+        "globalSpeed": f"{speed}%",
+    }
+    headers = json.loads(os.getenv("PLAY_HT_API_KEY"))
+    async with session.post(
+        "https://play.ht/api/v1/convert", json=payload, headers=headers
+    ) as response:
+        json_response = await response.json()
+        id = json_response["transcriptionId"]
+        url = f"https://play.ht/api/v1/articleStatus?transcriptionId={id}"
+    i = 0
+    while True:
+        async with session.get(url, headers=headers) as response:
+            json_response = await response.json()
+            message = json_response.get("message", "")
+
+        if message == "Transcription still in progress":
+            print("請稍等")
+            i += 1
+            if i > 12:
+                print("請求超時")
+                break
+            await asyncio.sleep(10)  # 非同步等待
+        else:
+            return json_response
+
+
+async def download_audio_async(session, url, path):
+    async with session.get(url) as response:
+        with await aio_open(path, "wb") as f:
+            while chunk := await response.content.read(8192):
+                await f.write(chunk)
+
+
+def get_ssml(transcipts_json):
+    speaker_set = {}
+    last_speaker = None
+    if transcipts_json[0][0] == "Silence":
+        speaker_set[transcipts_json[1][0]] = {"times": 0, "content": "<speak>\n"}
+        last_speaker = transcipts_json[1][0]
+        transcipts_json = transcipts_json[1:]
+    for row in transcipts_json:
+        speaker, start_time, end_time, text = row
+        if speaker not in speaker_set and speaker != "Silence":
+            speaker_set[speaker] = {"times": 0, "content": "<speak>\n"}
+        # 检查这一行是否是 --- 行
+        if speaker == "Silence":
+            # 计算持续时间（秒）
+            duration = float(end_time) - float(start_time)
+            speaker_set[last_speaker][
+                "content"
+            ] += f"<break time='{round(duration+3,2)}s'/>\n"
+        else:
+            # 如果这一行不是 --- 行，那么就把它加到结果字符串中
+            current_text = text.lstrip().replace(" ", "")
+            if current_text[-1] not in ".?!。？！":
+                current_text += "."
+            speaker_set[speaker]["content"] += current_text
+            speaker_set[speaker]["content"] += "\n"
+            last_speaker = speaker
+            if (
+                len(speaker_set[speaker]["content"])
+                > (speaker_set[speaker]["times"] + 1) * 2000
+            ):
+                speaker_set[speaker]["content"] += "</speak>\n"
+                speaker_set[speaker]["content"] += "<speak>\n"
+                speaker_set[speaker]["times"] += 1
+    ssml_list = []
+    for speaker in speaker_set:
+        speaker_set[speaker]["content"] += "</speak>"
+        ssml_list.append(speaker_set[speaker]["content"])
+
+    return ssml_list

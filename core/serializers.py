@@ -29,6 +29,7 @@ class TaskSerializer(serializers.ModelSerializer):
 
 
 class TaskWithTranscriptSerializer(serializers.ModelSerializer):
+    speaker_counts = serializers.SerializerMethodField()
     transcript = serializers.SerializerMethodField()
     mp3 = serializers.SerializerMethodField()
     mp4 = serializers.SerializerMethodField()
@@ -39,26 +40,31 @@ class TaskWithTranscriptSerializer(serializers.ModelSerializer):
         fields = [
             "taskID",
             "target_language",
-            "voice_selection",
             "mode",
             "title",
-            "needModify",
+            "speaker_counts",
             "status",
             "request_time",
             "transcript",
             "mp3",
             "mp4",
         ]
-
+    def get_speaker_counts(self, obj):
+        return obj.video.speaker_counts
+    
     def get_transcript(self, obj):
         if not self.should_return_url(obj, TRANSCRIPT_STATUS_MAP):
             return None
-        transcript = obj.transcript
-        if transcript:
+        transcript = obj.transcript  #list
+        translated_text = obj.deepl.translated_text #list
+        if transcript and translated_text:
+            
             if transcript.modified_transcript:
                 return transcript.modified_transcript
-            else:
-                return transcript.transcript
+            for i, trans in enumerate(transcript.transcript):
+                trans.append(translated_text[i][3])
+            
+            return transcript.transcript
         return None
 
     def get_mp3(self, task):

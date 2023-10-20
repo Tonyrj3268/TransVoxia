@@ -7,6 +7,8 @@ import os
 import errno
 from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor
+import traceback
+import asyncio
 
 def process_task_notNeedModify(task):
     raise Exception("it should not be used")
@@ -50,33 +52,35 @@ def process_task_Remaining(task:Task,voice_list:list[str]):
         task.fileLocation,
         "translated/audio/" + basename + ".mp3",
         "translated/video/" + basename + ".mp4",
-        "translated/bgmusic/" + basename + "/no_vocals.mp3",
+        "translated/bgmusic/mdx_extra/" + basename + "/no_vocals.mp3",
     ]
 
     with handle_task_exceptions(task, file_paths):
-        audio_file_paths = process_audio(task,voice_list)
+        audio_file_paths = asyncio.run(process_audio(task, voice_list))
         csv_list = []
         with ThreadPoolExecutor() as executor:
             for mp3_path, voice in zip(audio_file_paths, voice_list):
                 csv = f"{os.path.splitext(mp3_path)[0]}.csv"
+                csv_list.append(csv)
                 executor.submit(
                     auditok_detect,
                     mp3_path,
                     csv,
                 )
-                csv_list.append(csv)
         bumusic_dir = f"translated/bgmusic"
         split_bg_music(task.fileLocation,output_dir=bumusic_dir)
-        bumusic_path =os.path.join(bumusic_dir, f"{basename}/no_vocals.mp3")
-        # merge_audio_and_video(task, audio_file_paths,csv_list)
+        bumusic_path =os.path.join(bumusic_dir,"mdx_extra", f"{basename}/no_vocals.mp3")
         merge_audio_and_bgmusic(task, audio_file_paths, csv_list, bumusic_path)
+
         if task.mode == "video":
             process_synthesis(task)
 
+        file_paths+=csv_list
+        file_paths+=audio_file_paths
+        file_paths.append(bumusic_dir+"/mdx_extra")
+       
     task.status = TaskStatus.TASK_COMPLETED
     task.save()
-    deleteFile(csv_list)
-    deleteFile([bumusic_dir])
     print(f"結束處理任務：{task.taskID}")
 
 
@@ -106,6 +110,9 @@ def handle_task_exceptions(task, file_paths):
     except Exception as e:
         task.status = TaskStatus.TASK_FAILED
         task.save()
-        print(f"强制结束任务：{task.taskID}，错误：{str(e)}")
+        print(f"强制结束任务：{task.taskID}")
+        print(traceback.format_exc())
     finally:
+        print(f"清理任务")
+        print(file_paths)
         deleteFile(file_paths)

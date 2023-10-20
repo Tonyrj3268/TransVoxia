@@ -5,7 +5,7 @@ import os
 from video.models import Transcript, Video
 from audio.models import Play_ht
 from translator.models import Deepl
-
+from asgiref.sync import sync_to_async
 
 class TaskStatus(models.TextChoices):
     UNPROCESSED = "0", _("未處理")
@@ -50,3 +50,6 @@ class Task(models.Model):
         documents/my_file.txt -> my_file
         """
         return os.path.splitext(os.path.basename(self.fileLocation))[0]
+    @sync_to_async
+    def get_translated_text(self):
+        return self.deepl.translated_text

@@ -72,10 +72,10 @@ def format_time(time):
 
 def get_transcript(file_path: str) -> list:
     device = "cuda"
-    batch_size = 32  # reduce if low on GPU mem
+    batch_size = 16  # reduce if low on GPU mem
     compute_type = "float16"  # change to "int8" if low on GPU mem (may reduce accuracy)
     
-    model = whisperx.load_model("large", device, compute_type=compute_type)
+    model = whisperx.load_model("large-v2", device, compute_type=compute_type)
     audio = whisperx.load_audio(file_path)
     result = model.transcribe(audio, batch_size=batch_size)
     model_a, metadata = whisperx.load_align_model(
@@ -104,7 +104,7 @@ def get_entries(file_path: str):
     speaker = set()
     time_stamp_transcript = get_transcript(file_path)
     for segment in time_stamp_transcript:
-        for i,word in enumerate(segment["words"]):
+        for j,word in enumerate(segment["words"]):
             try:
                 entries.append(
                     {
@@ -115,11 +115,12 @@ def get_entries(file_path: str):
                     }
                 )
                 speaker.add(segment["speaker"])
-                if i == len(segment["words"])-1 and not ends_with_punctuation(word["word"]):
-                    entries[-1]["word"] += "."
+                # if j == len(segment["words"])-1 and not ends_with_punctuation(word["word"]):
+                #     entries[-1]["word"] += "."
             except Exception as e:
                 print(e)
                 pass
+
     combined_entries = []
     current_entry = None
     current_text = ""
@@ -183,5 +184,15 @@ def get_entries(file_path: str):
             "---",
         )
     )
-
+    file_path = r"C:\Users\soslab\Desktop\109_projects\TransVoxia\audio-temp/transcript.csv"
+    import csv
+    with open(
+        file_path,
+        "w",
+        newline="",
+        encoding="utf-8",
+    ) as output_file:
+        writer = csv.writer(output_file)
+        for line in formatted_entries_rounded:
+            writer.writerow(line)
     return formatted_entries_rounded, speaker

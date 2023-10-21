@@ -1,7 +1,6 @@
 import json
 import os
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict
 
 from django.core.files.storage import default_storage
 from django.db import connection
@@ -22,12 +21,15 @@ from video.models import Transcript
 
 from .models import Task, TaskStatus
 from .serializers import TaskSerializer, TaskWithTranscriptSerializer
-from .utils import (process_task_NeedModify, process_task_notNeedModify,
-                    process_task_Remaining)
+from .utils import (
+    process_task_NeedModify,
+    process_task_notNeedModify,
+    process_task_Remaining,
+)
 
 # Create your views here.
 executor = ThreadPoolExecutor(max_workers=4)
-task_futures: Dict[int, ThreadPoolExecutor] = {}
+task_futures: dict[int, ThreadPoolExecutor] = {}
 
 
 def get_dynamic_swagger_params():
@@ -125,6 +127,13 @@ class TaskListAPIView(APIView):
                 required=True,
             ),
             openapi.Parameter(
+                name="needBgmusic",
+                in_=openapi.IN_QUERY,
+                type=openapi.TYPE_BOOLEAN,
+                description="whether to add background music to the video/audio",
+                required=True,
+            ),
+            openapi.Parameter(
                 name="file",
                 in_=openapi.IN_FORM,
                 type=openapi.TYPE_FILE,
@@ -139,7 +148,7 @@ class TaskListAPIView(APIView):
             mode = request.GET.get("mode")
             title = request.GET.get("title")
             file = request.FILES.get("file")
-
+            needBgmusic = request.GET.get("needBgmusic")
             if not all([target_language, mode, title, file]):
                 return Response(
                     {"error": "缺少必要的參數"}, status=status.HTTP_400_BAD_REQUEST
@@ -150,7 +159,7 @@ class TaskListAPIView(APIView):
                 target_language=target_language,
                 mode=mode,
                 title=title,
-                needModify=True,
+                needBgmusic=(needBgmusic == "true"),
             )
 
             if file:
@@ -303,7 +312,9 @@ class ContinueTaskAPIView(APIView):
             openapi.Parameter(
                 name="new_transcript",
                 in_=openapi.IN_QUERY,
-                type=openapi.TYPE_STRING,
+                type=openapi.TYPE_ARRAY,
+                items=openapi.Items(type=openapi.TYPE_STRING),
+                collectionFormat="multi",
                 required=True,
             ),
             openapi.Parameter(
@@ -320,17 +331,23 @@ class ContinueTaskAPIView(APIView):
         try:
             data = json.loads(request.body)
             new_transcript = data.get("new_transcript", [])
-            voice_list = data.get("voice_list", [])
-            voice_list = [
-                "zh-CN-YunxiNeural",
-                "zh-CN-XiaoxiaoNeural",
-                "zh-CN-YunyangNeural",
-            ]
+            voice_list = data.get(
+                "voice_list",
+                [
+                    "zh-CN-YunxiNeural",
+                    "zh-CN-XiaoxiaoNeural",
+                    "zh-CN-YunyangNeural",
+                ],
+            )
+
             user = CustomUser.objects.get(username="root")
             task = get_object_or_404(Task, taskID=taskID)
             if user != task.user:
                 return Response({"msg": "無權限操作該任務"}, status=status.HTTP_403_FORBIDDEN)
-
+            if task.status == TaskStatus.TASK_COMPLETED:
+                return Response(
+                    {"msg": "任務為逐字稿，已完成，不進行任何操作"}, status=status.HTTP_200_OK
+                )
             if task.status == TaskStatus.TASK_CANCELLED:
                 return Response({"msg": "任務已被取消，不進行任何操作"}, status=status.HTTP_200_OK)
 
@@ -342,7 +359,6 @@ class ContinueTaskAPIView(APIView):
                 process_task_Remaining, task, voice_list=voice_list
             )
             task_futures[task.taskID] = future
-
             return Response({"msg": "任務已開始處理"}, status=status.HTTP_200_OK)
         except Http404:
             return Response({"msg": "找不到指定的任務"}, status=status.HTTP_404_NOT_FOUND)

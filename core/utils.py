@@ -5,13 +5,21 @@ import traceback
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 
-from audio.utils import (auditok_detect, merge_audio, merge_bgmusic,
-                         process_audio, split_bg_music)
+from audio.utils import (
+    auditok_detect,
+    merge_audio,
+    process_audio,
+    split_bg_music,
+    merge_video,
+    merge_bgmusic_with_video,
+    merge_bgmusic_with_audio,
+)
 from translator.utils import process_deepl
-from video.utils import process_synthesis, process_transcript
+from video.utils import process_transcript
 
 from .decorators import TaskCancelledException
 from .models import Task, TaskStatus
+from django.core.files.storage import default_storage
 
 
 def process_task_notNeedModify(task):
@@ -57,6 +65,7 @@ def process_task_Remaining(task: Task, voice_list: list[str]):
         "translated/audio/" + basename + ".mp3",
         "translated/video/" + basename + ".mp4",
         "translated/bgmusic/mdx_extra/" + basename + "/no_vocals.mp3",
+        "translated/bgmusic/mdx_extra/" + basename + "/vocals.mp3",
     ]
 
     with handle_task_exceptions(task, file_paths):
@@ -72,24 +81,35 @@ def process_task_Remaining(task: Task, voice_list: list[str]):
                     csv,
                 )
 
-        vocal_path = merge_audio(task, audio_file_paths, csv_list)
+        if task.mode == "video":
+            output_path = merge_video(task, audio_file_paths, csv_list)
+        elif task.mode == "audio":
+            output_path = merge_audio(task, audio_file_paths, csv_list)
+        else:
+            raise Exception("unknown mode")
         if task.needBgmusic:
             bumusic_dir = f"translated/bgmusic"
             split_bg_music(task.fileLocation, output_dir=bumusic_dir)
             bumusic_path = os.path.join(
                 bumusic_dir, "mdx_extra", f"{basename}/no_vocals.mp3"
             )
-            merge_bgmusic(task, vocal_path, bumusic_path)
-        if task.mode == "video":
-            process_synthesis(task)
+            if task.mode == "video":
+                output_path = merge_bgmusic_with_video(task, output_path, bumusic_path)
+            elif task.mode == "audio":
+                output_path = merge_bgmusic_with_audio(task, output_path, bumusic_path)
+            else:
+                raise Exception("unknown mode")
 
         file_paths += csv_list
         file_paths += audio_file_paths
-        file_paths.append(bumusic_dir + "/mdx_extra")
 
-    task.status = TaskStatus.TASK_COMPLETED
-    task.save()
-    print(f"結束處理任務：{task.taskID}")
+        print(f"開始儲存檔案：{output_path}")
+        with open(output_path, "rb") as f:
+            default_storage.save(output_path, f)
+
+        task.status = TaskStatus.TASK_COMPLETED
+        task.save()
+        print(f"結束處理任務：{task.taskID}")
 
 
 def deleteFile(file_paths):

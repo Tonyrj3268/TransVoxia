@@ -1,7 +1,7 @@
+from django.core.files.storage import default_storage
 from rest_framework import serializers
 
 from core.models import Task, TaskStatus
-from django.core.files.storage import default_storage
 
 TRANSCRIPT_STATUS_MAP = {
     TaskStatus.TRANSLATION_PROCESSING: True,
@@ -49,21 +49,21 @@ class TaskWithTranscriptSerializer(serializers.ModelSerializer):
             "mp3",
             "mp4",
         ]
+
     def get_speaker_counts(self, obj):
         return obj.video.speaker_counts
-    
+
     def get_transcript(self, obj):
         if not self.should_return_url(obj, TRANSCRIPT_STATUS_MAP):
             return None
-        transcript = obj.transcript  #list
-        translated_text = obj.deepl.translated_text #list
+        transcript = obj.transcript  # list
+        translated_text = obj.deepl.translated_text  # list
         if transcript and translated_text:
-            
             if transcript.modified_transcript:
                 return transcript.modified_transcript
             for i, trans in enumerate(transcript.transcript):
                 trans.append(translated_text[i][3])
-            
+
             return transcript.transcript
         return None
 

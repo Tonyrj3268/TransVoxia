@@ -1,14 +1,18 @@
-from video.utils import process_transcript, process_synthesis
-from audio.utils import process_audio, merge_audio_and_video, split_bg_music, auditok_detect,merge_audio_and_bgmusic
-from translator.utils import process_deepl
-from .decorators import TaskCancelledException
-from .models import TaskStatus, Task
-import os
-import errno
-from contextlib import contextmanager
-from concurrent.futures import ThreadPoolExecutor
-import traceback
 import asyncio
+import errno
+import os
+import traceback
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
+
+from audio.utils import (auditok_detect, merge_audio, merge_bgmusic,
+                         process_audio, split_bg_music)
+from translator.utils import process_deepl
+from video.utils import process_synthesis, process_transcript
+
+from .decorators import TaskCancelledException
+from .models import Task, TaskStatus
+
 
 def process_task_notNeedModify(task):
     raise Exception("it should not be used")
@@ -45,7 +49,7 @@ def process_task_NeedModify(task):
     task.save()
 
 
-def process_task_Remaining(task:Task,voice_list:list[str]):
+def process_task_Remaining(task: Task, voice_list: list[str]):
     print(f"開始處理剩餘任務：{task.taskID}")
     basename = task.get_file_basename()
     file_paths = [
@@ -67,18 +71,22 @@ def process_task_Remaining(task:Task,voice_list:list[str]):
                     mp3_path,
                     csv,
                 )
-        bumusic_dir = f"translated/bgmusic"
-        split_bg_music(task.fileLocation,output_dir=bumusic_dir)
-        bumusic_path =os.path.join(bumusic_dir,"mdx_extra", f"{basename}/no_vocals.mp3")
-        merge_audio_and_bgmusic(task, audio_file_paths, csv_list, bumusic_path)
 
+        vocal_path = merge_audio(task, audio_file_paths, csv_list)
+        if task.needBgmusic:
+            bumusic_dir = f"translated/bgmusic"
+            split_bg_music(task.fileLocation, output_dir=bumusic_dir)
+            bumusic_path = os.path.join(
+                bumusic_dir, "mdx_extra", f"{basename}/no_vocals.mp3"
+            )
+            merge_bgmusic(task, vocal_path, bumusic_path)
         if task.mode == "video":
             process_synthesis(task)
 
-        file_paths+=csv_list
-        file_paths+=audio_file_paths
-        file_paths.append(bumusic_dir+"/mdx_extra")
-       
+        file_paths += csv_list
+        file_paths += audio_file_paths
+        file_paths.append(bumusic_dir + "/mdx_extra")
+
     task.status = TaskStatus.TASK_COMPLETED
     task.save()
     print(f"結束處理任務：{task.taskID}")
@@ -96,7 +104,6 @@ def deleteFile(file_paths):
                 print(f"檔案正在被使用，無法刪除: {file_path}")
             else:
                 print(f"刪除檔案時發生錯誤: {file_path} - {str(e)}")
-
 
 
 @contextmanager

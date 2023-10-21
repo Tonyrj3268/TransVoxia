@@ -1,29 +1,30 @@
-from django.shortcuts import get_object_or_404
-from django.core.files.storage import default_storage
-from django.http import Http404
-from django.db.models import Prefetch
+import json
+import os
 from concurrent.futures import ThreadPoolExecutor
-from drf_yasg.utils import swagger_auto_schema
+from typing import Dict
+
+from django.core.files.storage import default_storage
+from django.db import connection
+from django.db.models import Prefetch
+from django.http import Http404
+from django.shortcuts import get_object_or_404
 from drf_yasg import openapi
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
-from rest_framework.views import APIView
-from rest_framework.response import Response
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.parsers import MultiPartParser
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from accounts.models import CustomUser
+from audio.models import LanguageMapping, Play_ht_voices
+from video.models import Transcript
+
 from .models import Task, TaskStatus
 from .serializers import TaskSerializer, TaskWithTranscriptSerializer
-from video.models import Transcript
-from audio.models import Play_ht_voices, LanguageMapping
-from .utils import (
-    process_task_notNeedModify,
-    process_task_NeedModify,
-    process_task_Remaining,
-)
-import os
-from accounts.models import CustomUser
-from rest_framework.pagination import PageNumberPagination
-from typing import Dict
-from django.db import connection
-import json
+from .utils import (process_task_NeedModify, process_task_notNeedModify,
+                    process_task_Remaining)
+
 # Create your views here.
 executor = ThreadPoolExecutor(max_workers=4)
 task_futures: Dict[int, ThreadPoolExecutor] = {}
@@ -139,9 +140,7 @@ class TaskListAPIView(APIView):
             title = request.GET.get("title")
             file = request.FILES.get("file")
 
-            if not all(
-                [target_language, mode, title, file]
-            ):
+            if not all([target_language, mode, title, file]):
                 return Response(
                     {"error": "缺少必要的參數"}, status=status.HTTP_400_BAD_REQUEST
                 )
@@ -300,7 +299,7 @@ class ContinueTaskAPIView(APIView):
             404: "Not Found: Task not found or already completed",
             500: "Internal Server Error",
         },
-         manual_parameters=[
+        manual_parameters=[
             openapi.Parameter(
                 name="new_transcript",
                 in_=openapi.IN_QUERY,
@@ -312,17 +311,16 @@ class ContinueTaskAPIView(APIView):
                 in_=openapi.IN_QUERY,
                 type=openapi.TYPE_ARRAY,
                 items=openapi.Items(type=openapi.TYPE_STRING),
-                collectionFormat='multi',
+                collectionFormat="multi",
                 required=True,
             ),
-         ]
-    
+        ],
     )
     def post(self, request, taskID):
         try:
             data = json.loads(request.body)
-            new_transcript = data.get('new_transcript', [])
-            voice_list = data.get('voice_list', [])
+            new_transcript = data.get("new_transcript", [])
+            voice_list = data.get("voice_list", [])
             voice_list = [
                 "zh-CN-YunxiNeural",
                 "zh-CN-XiaoxiaoNeural",
@@ -340,7 +338,9 @@ class ContinueTaskAPIView(APIView):
                 return Response({"msg": "任務不需要編輯，不進行任何操作"}, status=status.HTTP_200_OK)
 
             self.handle_file(task.fileLocation)
-            future = executor.submit(process_task_Remaining, task,voice_list=voice_list)
+            future = executor.submit(
+                process_task_Remaining, task, voice_list=voice_list
+            )
             task_futures[task.taskID] = future
 
             return Response({"msg": "任務已開始處理"}, status=status.HTTP_200_OK)

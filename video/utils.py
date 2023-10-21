@@ -1,13 +1,17 @@
 import traceback
-from mutagen.mp4 import MP4
-from mutagen.mp3 import MP3
-from .models import Video, Transcript
-from core.models import Task, TaskStatus
-from core.decorators import check_task_status
-from moviepy.editor import VideoFileClip, AudioFileClip
-from django.core.files.storage import default_storage
-import whisperx
+
 import torch
+import whisperx
+from django.core.files.storage import default_storage
+from moviepy.editor import AudioFileClip, VideoFileClip
+from mutagen.mp3 import MP3
+from mutagen.mp4 import MP4
+
+from core.decorators import check_task_status
+from core.models import Task, TaskStatus
+
+from .models import Transcript, Video
+
 
 @check_task_status(TaskStatus.TRANSCRIPT_PROCESSING)
 def process_transcript(task: Task) -> None:
@@ -44,7 +48,7 @@ def process_synthesis(task: Task) -> None:
 def generate_transcript_from_file(task: Task) -> str:
     location = task.fileLocation
     try:
-        formatted_entries,speakers = get_entries(location)
+        formatted_entries, speakers = get_entries(location)
     except Exception as e:
         error_message = "Failed to transcribe audio file.\n" + traceback.format_exc()
         raise Exception(error_message) from e
@@ -55,7 +59,9 @@ def generate_transcript_from_file(task: Task) -> str:
         length = MP3(location).info.length  # type: ignore
     else:
         raise Exception(f"不支援的檔案格式：{extension}，路徑：{location}")
-    video = Video.objects.create(file_location=location, length=length,speaker_counts=len(speakers), status=True)
+    video = Video.objects.create(
+        file_location=location, length=length, speaker_counts=len(speakers), status=True
+    )
     task.video = video
     task.save()
     return formatted_entries
@@ -74,14 +80,14 @@ def get_transcript(file_path: str) -> list:
     device = "cuda"
     batch_size = 16  # reduce if low on GPU mem
     compute_type = "float16"  # change to "int8" if low on GPU mem (may reduce accuracy)
-    
+
     model = whisperx.load_model("large-v2", device, compute_type=compute_type)
     audio = whisperx.load_audio(file_path)
     result = model.transcribe(audio, batch_size=batch_size)
     model_a, metadata = whisperx.load_align_model(
         language_code=result["language"], device=device
     )
-    
+
     result = whisperx.align(
         result["segments"],
         model_a,
@@ -104,7 +110,7 @@ def get_entries(file_path: str):
     speaker = set()
     time_stamp_transcript = get_transcript(file_path)
     for segment in time_stamp_transcript:
-        for j,word in enumerate(segment["words"]):
+        for j, word in enumerate(segment["words"]):
             try:
                 entries.append(
                     {
@@ -184,8 +190,11 @@ def get_entries(file_path: str):
             "---",
         )
     )
-    file_path = r"C:\Users\soslab\Desktop\109_projects\TransVoxia\audio-temp/transcript.csv"
+    file_path = (
+        r"C:\Users\soslab\Desktop\109_projects\TransVoxia\audio-temp/transcript.csv"
+    )
     import csv
+
     with open(
         file_path,
         "w",

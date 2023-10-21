@@ -1,10 +1,12 @@
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from drf_yasg.utils import swagger_auto_schema
+
+from core.models import Task
+
+from .api_description import chat_view_set
 from .serializers import ChatSerializer, TranslatorChatgptSerializer
 from .utils import TextGeneratorFactory
-from .api_description import chat_view_set
-from core.models import Task
 
 
 class ChatViewSet(APIView):

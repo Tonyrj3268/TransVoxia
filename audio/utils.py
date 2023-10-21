@@ -1,52 +1,24 @@
-import requests
-import json
-import time
-from core.models import Task, TaskStatus
-from .models import Play_ht
-import os
-from pydub import AudioSegment
-from pydub.utils import mediainfo
-from django.core.files.storage import default_storage
-from core.decorators import check_task_status
-from moviepy.editor import (
-    VideoFileClip,
-    AudioFileClip,
-    concatenate_audioclips,
-    AudioClip,
-)
-from concurrent.futures import ThreadPoolExecutor
-import concurrent.futures
-import auditok
+import asyncio
 import csv
+import json
+import os
+import re
+from collections import OrderedDict, deque
+
+import aiohttp
+import auditok
 import demucs.separate
 import pandas as pd
-import re
-import aiohttp
-import asyncio
-# @check_task_status(TaskStatus.VOICE_PROCESSING)
-# async def process_audio(task: Task,voice_list:list[str]):
-#     text = task.deepl.translated_text  # JsonField
-#     task_file_name = task.get_file_basename()
-#     ssml_list = get_ssml(text)
-#     audio_file_paths = []
-#     with ThreadPoolExecutor() as executor:
-#         future_to_task = {}
-#         for ssml, voice in zip(ssml_list, voice_list):
-#             future = executor.submit(make_voice, ssml, voice)
-#             future_to_task[future] = (ssml, voice)
-#         for future in concurrent.futures.as_completed(future_to_task):
-#             ssml, voice = future_to_task[future]
+from django.core.files.storage import default_storage
+from moviepy.editor import (AudioFileClip, CompositeAudioClip,
+                            concatenate_audioclips)
 
-#             try:
-#                 data = future.result()
-#                 url = data["audioUrl"]
-#                 audio_file_path = f"audio-temp/{task_file_name}_{voice}.mp3"
-#                 audio_file_paths.append(audio_file_path)
-#                 executor.submit(download_audio, url, audio_file_path)
-                
-#             except Exception as exc:
-#                 print(f'Generated an exception: {exc}')
-#     return audio_file_paths
+from core.decorators import check_task_status
+from core.models import Task, TaskStatus
+
+from .models import Play_ht
+
+
 @check_task_status(TaskStatus.VOICE_PROCESSING)
 async def process_audio(task: Task, voice_list: list[str]):
     text = await task.get_translated_text()
@@ -54,62 +26,33 @@ async def process_audio(task: Task, voice_list: list[str]):
     ssml_list = get_ssml(text)
     audio_file_paths = []
 
-    async def handle_task(ssml, voice,audio_file_path):
+    async def handle_task(ssml, voice, audio_file_path):
         try:
             data = await make_voice(ssml, voice)
             url = data["audioUrl"]
             await download_audio(url, audio_file_path)
         except Exception as exc:
-            print(f'Generated an exception: {exc}')
+            print(f"Generated an exception: {exc}")
 
     tasks = []
     for ssml, voice in zip(ssml_list, voice_list):
         audio_file_path = f"audio-temp/{task_file_name}_{voice}.mp3"
         audio_file_paths.append(audio_file_path)
-        task = handle_task(ssml, voice,audio_file_path)
+        task = handle_task(ssml, voice, audio_file_path)
         tasks.append(task)
 
     await asyncio.gather(*tasks)
 
     return audio_file_paths
 
-@check_task_status(TaskStatus.VOICE_MERGE_PROCESSING)
-def merge_audio_and_video(task: Task, audio_file_paths: list[str]):
-    task_file_name = task.get_file_basename()
-    origin_length = task.video.length
-    combined_audio_path = f"audio-temp/{task_file_name}_complete.mp3"
-    combine_audio_files(audio_file_paths, combined_audio_path)
-
-    length_ratio = round(
-        get_audio_length(combined_audio_path) / float(origin_length), 3
-    )
-
-    fast_sound = speed_change(
-        AudioSegment.from_file(combined_audio_path, format="mp3"), length_ratio
-    )
-    for path in audio_file_paths:
-        os.remove(path)
-    os.remove(combined_audio_path)
-    combined_audio_new_path = f"translated/audio/{task_file_name}.mp3"
-    fast_sound.export(combined_audio_new_path, format="mp3")
-    playht = Play_ht.objects.create(
-        changed_audio_url=combined_audio_new_path,
-        length_ratio=length_ratio,
-        status=True,
-    )
-    task.playht = playht
-    task.save()
-    with open(combined_audio_new_path, "rb") as output_file:
-        default_storage.save(combined_audio_new_path, output_file)
 
 @check_task_status(TaskStatus.VOICE_MERGE_PROCESSING)
-def merge_audio_and_bgmusic(task: Task, audio_file_paths: list[str],csv_list,bgmusic_path:str=None):
+def merge_audio(task: Task, audio_file_paths: list[str], csv_list: list[str]) -> str:
     task_file_name = task.get_file_basename()
 
     combined_audio_path = f"translated/audio/{task_file_name}.mp3"
     origin_file_path = task.fileLocation
-    merge_vocal(task,csv_list,audio_file_paths,combined_audio_path,origin_file_path)
-    # os.remove(combined_audio_path)
+    merge_vocal(task, csv_list, audio_file_paths, combined_audio_path, origin_file_path)
     playht = Play_ht.objects.create(
         changed_audio_url=combined_audio_path,
         status=True,
@@ -118,12 +61,38 @@ def merge_audio_and_bgmusic(task: Task, audio_file_paths: list[str],csv_list,bgm
     task.save()
     with open(combined_audio_path, "rb") as output_file:
         default_storage.save(combined_audio_path, output_file)
-def get_headers():
-    return {
-        "accept": "application/json",
-        "AUTHORIZATION": "6d1275331bc1403ebd28045f7b8d9f5e",
-        "X-USER-ID": "9X30i7n3LMTk9OyzeTvSGxG9snO2",
-    }
+    return combined_audio_path
+
+
+@check_task_status(TaskStatus.VOCAL_MERGE_BGMUSIC)
+def merge_bgmusic(vocal_path: str, bg_music_path: str) -> None:
+    # 讀取你的人聲檔
+    # 讀取你的背景音樂檔
+    with AudioFileClip(vocal_path) as vocal, AudioFileClip(
+        bg_music_path
+    ) as background_music:
+        vocal_duration = vocal.duration
+        bg_music_duration = background_music.duration
+
+        # 如果背景音樂的持續時間小於視頻的持續時間，則更改背景音樂的速度以匹配視頻的持續時間
+        if bg_music_duration < vocal_duration:
+            speed_factor = vocal_duration / bg_music_duration
+            background_music = background_music.fl_time(
+                lambda t: t / speed_factor, apply_to=["audio"]
+            )
+            background_music = background_music.set_duration(vocal_duration)
+        else:
+            min_duration = min(original_audio.duration, background_music.duration)
+            original_audio = original_audio.subclip(0, min_duration)
+            background_music = background_music.subclip(0, min_duration)
+
+        # 創建一個CompositeAudioClip對象並將兩個音頻剪輯合成為一個
+        combined_audio = CompositeAudioClip(
+            [original_audio.volumex(0.8), background_music.volumex(0.2)]
+        )
+        # 將合成的音頻剪輯寫入新文件
+        combined_audio.write_audiofile(vocal_path)
+
 
 async def make_voice(text, voice, speed=100):
     pattern = re.compile(r"(<speak>.*?</speak>)", re.DOTALL)
@@ -137,12 +106,16 @@ async def make_voice(text, voice, speed=100):
             "globalSpeed": str(speed) + "%",
         }
     )
-    headers = get_headers()
-    
+    headers = {
+        "accept": "application/json",
+        "AUTHORIZATION": "6d1275331bc1403ebd28045f7b8d9f5e",
+        "X-USER-ID": "9X30i7n3LMTk9OyzeTvSGxG9snO2",
+    }
+
     async with aiohttp.ClientSession() as session:
-        async with session.post("https://play.ht/api/v1/convert/",
-                                json=json.loads(payload),
-                                headers=headers) as response:
+        async with session.post(
+            "https://play.ht/api/v1/convert/", json=json.loads(payload), headers=headers
+        ) as response:
             res_json = await response.json()
             id = res_json["transcriptionId"]
             url = "https://play.ht/api/v1/articleStatus?transcriptionId=" + id
@@ -150,7 +123,7 @@ async def make_voice(text, voice, speed=100):
     i = 0
     wait_time = 10
     while True:
-        dic = await check_voice_make(url)  # 確保此函數是非阻塞的或已異步化
+        dic = await check_voice_make(url)
         if dic != True:
             break
         i += 1
@@ -159,28 +132,31 @@ async def make_voice(text, voice, speed=100):
             break
         await asyncio.sleep(wait_time)
         wait_time = min(wait_time * 2, 60)
-    
+
     return dic
+
 
 async def check_voice_make(url):
     headers = json.loads(os.getenv("PLAY_HT_API_KEY"))
-    
+
     async with aiohttp.ClientSession() as session:
         async with session.get(url, headers=headers) as response:
             text = await response.text()
             dict_data = json.loads(
                 text,
                 object_pairs_hook=lambda x: {
-                    k: True if v == "true" else False if v == "false" else v for k, v in x
+                    k: True if v == "true" else False if v == "false" else v
+                    for k, v in x
                 },
             )
-    
+
     if dict_data["message"] == "Transcription still in progress":
         print("請稍等")
         await asyncio.sleep(10)
         return True
     else:
         return dict_data
+
 
 async def download_audio(url, path):
     async with aiohttp.ClientSession() as session:
@@ -193,28 +169,6 @@ async def download_audio(url, path):
                     if not chunk:
                         break
                     f.write(chunk)
-
-
-def combine_audio_files(audio_file_paths, output_path):
-    combined = AudioSegment.empty()
-
-    for path in audio_file_paths:
-        audio = AudioSegment.from_mp3(path)
-        combined += audio
-
-    combined.export(output_path, format="mp3")
-
-
-def get_audio_length(audio_path):
-    info = mediainfo(audio_path)
-    return float(info["duration"])
-
-
-def speed_change(sound, speed=1.0):
-    sound_with_altered_frame_rate = sound._spawn(
-        sound.raw_data, overrides={"frame_rate": int(sound.frame_rate * speed)}
-    )
-    return sound_with_altered_frame_rate.set_frame_rate(sound.frame_rate)
 
 
 def get_ssml(transcipts_json):
@@ -271,6 +225,7 @@ def split_bg_music(origin_mp4, output_dir):
         ]
     )
 
+
 def auditok_detect(input_audio, output_csv):
     try:
         region = auditok.load(input_audio)
@@ -306,24 +261,22 @@ def auditok_detect(input_audio, output_csv):
             (entry["start"], entry["end"], entry["text"].strip())
             for entry in combined_entries
         ]
-        with open(
-            output_csv,
-            "w",
-            encoding="utf-8",
-            newline=''
-        ) as output_file:
+        with open(output_csv, "w", encoding="utf-8", newline="") as output_file:
             writer = csv.writer(output_file)
             for line in formatted_entries_rounded:
                 writer.writerow(line)
     except Exception as e:
         print(e)
 
+
 def calculate_ratio_and_extremes(origin_trans, new_trans):
     # 讀取文件
     new_df = pd.DataFrame(new_trans, columns=["Speaker", "Start", "End", "Content"])
-    new_df = new_df.astype({'Start': float, 'End': float})
-    origin_df = pd.DataFrame(origin_trans, columns=["Speaker", "Start", "End", "Content"])
-    origin_df = origin_df.astype({'Start': float, 'End': float})
+    new_df = new_df.astype({"Start": float, "End": float})
+    origin_df = pd.DataFrame(
+        origin_trans, columns=["Speaker", "Start", "End", "Content"]
+    )
+    origin_df = origin_df.astype({"Start": float, "End": float})
     # 過濾包含 '---' 的行
     new_filtered = new_df[new_df.iloc[:, 2] != "---"].copy()
     origin_filtered = origin_df[origin_df.iloc[:, 2] != "---"].copy()
@@ -349,9 +302,9 @@ def calculate_ratio_and_extremes(origin_trans, new_trans):
 
 
 # 讀取時間軸檔案並解析
-def parse_timeline_file(trans:list) -> list:
+def parse_timeline_file(trans: list) -> list:
     times = []
-    
+
     for row in trans:
         speaker, start_time, end_time, content = row
         times.append(
@@ -365,10 +318,7 @@ def parse_timeline_file(trans:list) -> list:
     return times
 
 
-from collections import deque, OrderedDict
-
-
-def merge_csv(task:Task, csv_paths:list[str]):
+def merge_csv(task: Task, csv_paths: list[str]):
     # original_rows = task.transcript.modified_transcript if task.transcript.modified_transcript else task.transcript.transcript
     original_rows = task.transcript.transcript
     speaker_set = OrderedDict(
@@ -385,7 +335,7 @@ def merge_csv(task:Task, csv_paths:list[str]):
             reader = csv.reader(f)
             time_update_queues[speaker] = deque([(row[0], row[1]) for row in reader])
     new_rows = []
-    for i,row in enumerate(original_rows):
+    for i, row in enumerate(original_rows):
         speaker, _, _, content = row
         new_speaker = speaker_to_filename.get(speaker, speaker)  # 使用CSV檔名作為新的speaker
         if new_speaker != "Silence":
@@ -399,15 +349,14 @@ def merge_csv(task:Task, csv_paths:list[str]):
         new_rows.append([new_speaker, new_start_time, new_end_time, content])
     return new_rows
 
-def merge_vocal(
-    task:Task,
-    csv_paths,
-    input_mp3_list,
-    output_mp3,
-    origin_file_path
-):
-    origin_transcript =task.transcript.modified_transcript if task.transcript.modified_transcript else task.transcript.transcript
-    
+
+def merge_vocal(task: Task, csv_paths, input_mp3_list, output_mp3, origin_file_path):
+    origin_transcript = (
+        task.transcript.modified_transcript
+        if task.transcript.modified_transcript
+        else task.transcript.transcript
+    )
+
     origin = AudioFileClip(origin_file_path).fx(lambda audio: audio.volumex(0))
 
     mp4_times = parse_timeline_file(origin_transcript)
@@ -416,7 +365,7 @@ def merge_vocal(
         audio_clip_list[input_mp3] = AudioFileClip(input_mp3)
 
     mp3_trans_list = merge_csv(task, csv_paths)
-    
+
     ratios, _ = calculate_ratio_and_extremes(origin_transcript, mp3_trans_list)
     ratios.reset_index(drop=True, inplace=True)
     # 存儲剪切的片段
@@ -436,11 +385,10 @@ def merge_vocal(
             )
             mp3_clips.append(mp3_clip)
         else:
-            origin_clip = origin_clip.audio_loop(duration=mp4_duration+0.2)
+            origin_clip = origin_clip.audio_loop(duration=mp4_duration + 0.2)
             mp3_clips.append(origin_clip)
         i += 1
 
-    
     final_clip = concatenate_audioclips(mp3_clips)
     final_clip.write_audiofile(output_mp3)
     origin.close()

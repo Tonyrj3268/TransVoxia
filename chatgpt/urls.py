@@ -1,9 +1,6 @@
 from django.urls import path
-from .views import (
-    ChatViewSet,
-    TranslatorChatgptView,
-)
 
+from .views import ChatViewSet, TranslatorChatgptView
 
 urlpatterns = [
     path("chatgpt/", ChatViewSet.as_view(), name="chatgpt"),

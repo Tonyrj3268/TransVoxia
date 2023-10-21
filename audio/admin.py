@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 # Register your models here.
-from .models import Play_ht, Play_ht_voices, LanguageMapping
+from .models import LanguageMapping, Play_ht, Play_ht_voices
 
 
 @admin.register(Play_ht)

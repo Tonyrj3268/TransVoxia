@@ -1,7 +1,7 @@
 import pandas as pd
 from django.core.management.base import BaseCommand
 
-from audio.models import Play_ht_voices, LanguageMapping
+from audio.models import LanguageMapping, Play_ht_voices
 
 
 class Command(BaseCommand):

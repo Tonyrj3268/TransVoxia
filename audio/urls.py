@@ -1,9 +1,7 @@
 from django.urls import path
+
 from . import views
-from .views import (
-    LanguageListView,
-    VoicesListView,
-)
+from .views import LanguageListView, VoicesListView
 
 app_name = "audio"
 

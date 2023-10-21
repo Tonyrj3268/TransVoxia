@@ -1,8 +1,9 @@
-from django.test import TestCase, Client
-from django.urls import reverse
-from rest_framework import status
 import json
 from unittest.mock import patch
+
+from django.test import Client, TestCase
+from django.urls import reverse
+from rest_framework import status
 
 
 class GenerateTextTest(TestCase):

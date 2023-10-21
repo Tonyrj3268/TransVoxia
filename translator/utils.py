@@ -1,10 +1,13 @@
-from .models import Deepl
-import deepl
-import traceback
 import os
-from core.models import Task, TaskStatus
-from core.decorators import check_task_status
+import traceback
+
+import deepl
 from django.core.exceptions import ObjectDoesNotExist
+
+from core.decorators import check_task_status
+from core.models import Task, TaskStatus
+
+from .models import Deepl
 
 
 @check_task_status(TaskStatus.TRANSLATION_PROCESSING)
@@ -36,10 +39,7 @@ def process_deepl(task: Task):
                 row[3] = translated_texts[i]
                 i += 1
 
-        updated_json = [
-            [row[0],row[1],row[2],row[3]]
-            for row in rows
-        ]
+        updated_json = [[row[0], row[1], row[2], row[3]] for row in rows]
         deep = Deepl.objects.create(translated_text=updated_json, status=True)
         task.deepl = deep
         task.save()

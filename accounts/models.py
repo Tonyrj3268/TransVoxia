@@ -1,7 +1,8 @@
-from django.db import models
 from django.contrib.auth.models import AbstractUser
-from subscription.models import Subscription
+from django.db import models
 from django.utils import timezone
+
+from subscription.models import Subscription
 
 
 class CustomUser(AbstractUser):

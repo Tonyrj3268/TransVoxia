@@ -9,9 +9,14 @@ import aiohttp
 import auditok
 import demucs.separate
 import pandas as pd
-from django.core.files.storage import default_storage
-from moviepy.editor import (AudioFileClip, CompositeAudioClip,
-                            concatenate_audioclips)
+
+from moviepy.editor import (
+    AudioFileClip,
+    CompositeAudioClip,
+    concatenate_audioclips,
+    VideoFileClip,
+    concatenate_videoclips,
+)
 
 from core.decorators import check_task_status
 from core.models import Task, TaskStatus
@@ -59,13 +64,12 @@ def merge_audio(task: Task, audio_file_paths: list[str], csv_list: list[str]) ->
     )
     task.playht = playht
     task.save()
-    with open(combined_audio_path, "rb") as output_file:
-        default_storage.save(combined_audio_path, output_file)
+
     return combined_audio_path
 
 
 @check_task_status(TaskStatus.VOCAL_MERGE_BGMUSIC)
-def merge_bgmusic(vocal_path: str, bg_music_path: str) -> None:
+def merge_bgmusic_with_audio(task: Task, vocal_path: str, bg_music_path: str) -> str:
     # 讀取你的人聲檔
     # 讀取你的背景音樂檔
     with AudioFileClip(vocal_path) as vocal, AudioFileClip(
@@ -73,7 +77,6 @@ def merge_bgmusic(vocal_path: str, bg_music_path: str) -> None:
     ) as background_music:
         vocal_duration = vocal.duration
         bg_music_duration = background_music.duration
-
         # 如果背景音樂的持續時間小於視頻的持續時間，則更改背景音樂的速度以匹配視頻的持續時間
         if bg_music_duration < vocal_duration:
             speed_factor = vocal_duration / bg_music_duration
@@ -82,16 +85,102 @@ def merge_bgmusic(vocal_path: str, bg_music_path: str) -> None:
             )
             background_music = background_music.set_duration(vocal_duration)
         else:
-            min_duration = min(original_audio.duration, background_music.duration)
-            original_audio = original_audio.subclip(0, min_duration)
+            min_duration = min(vocal_duration, bg_music_duration)
+            vocal = vocal.subclip(0, min_duration)
             background_music = background_music.subclip(0, min_duration)
 
         # 創建一個CompositeAudioClip對象並將兩個音頻剪輯合成為一個
         combined_audio = CompositeAudioClip(
-            [original_audio.volumex(0.8), background_music.volumex(0.2)]
+            [vocal.volumex(0.8), background_music.volumex(0.2)]
         )
         # 將合成的音頻剪輯寫入新文件
+        combined_audio.fps = 44100
         combined_audio.write_audiofile(vocal_path)
+        combined_audio.close()
+    return vocal_path
+
+
+@check_task_status(TaskStatus.VOCAL_MERGE_BGMUSIC)
+def merge_bgmusic_with_video(task: Task, video_path: str, bg_music_path: str) -> str:
+    # 讀取你的人聲檔
+    # 讀取你的背景音樂檔
+    with VideoFileClip(video_path) as video, AudioFileClip(
+        bg_music_path
+    ) as background_music:
+        vocal = video.audio
+        vocal_duration = vocal.duration
+        bg_music_duration = background_music.duration
+        # 如果背景音樂的持續時間小於視頻的持續時間，則更改背景音樂的速度以匹配視頻的持續時間
+        if bg_music_duration < vocal_duration:
+            speed_factor = vocal_duration / bg_music_duration
+            background_music = background_music.fl_time(
+                lambda t: t / speed_factor, apply_to=["audio"]
+            )
+            background_music = background_music.set_duration(vocal_duration)
+        else:
+            min_duration = min(vocal_duration, bg_music_duration)
+            vocal = vocal.subclip(0, min_duration)
+            background_music = background_music.subclip(0, min_duration)
+
+        # 創建一個CompositeAudioClip對象並將兩個音頻剪輯合成為一個
+        combined_audio = CompositeAudioClip(
+            [vocal.volumex(0.8), background_music.volumex(0.2)]
+        )
+        # 將合成的音頻剪輯寫入新文件
+        video = video.set_audio(combined_audio)
+        video.write_videofile(video_path, audio_codec="aac")
+    return video_path
+
+
+@check_task_status(TaskStatus.VIDEO_MERGE_PROCESSING)
+def merge_video(task: Task, audio_file_paths: list[str], csv_list: list[str]) -> str:
+    origin_transcript = (
+        task.transcript.modified_transcript
+        if task.transcript.modified_transcript
+        else task.transcript.transcript
+    )
+    origin_transcript = task.transcript.transcript
+    video_path = task.fileLocation
+    mp4 = VideoFileClip(video_path).without_audio()
+    mp4_times = parse_timeline_file(origin_transcript)
+
+    audio_clip_list = {}
+    for input_mp3 in audio_file_paths:
+        audio_clip_list[input_mp3] = AudioFileClip(input_mp3)
+    mp3_trans_list = merge_csv(task, csv_list)
+    ratios, _ = calculate_ratio_and_extremes(origin_transcript, mp3_trans_list)
+    ratios.reset_index(drop=True, inplace=True)
+
+    mp4_clips = []
+    i = 0
+    while i < len(mp4_times):
+        _, mp4_start, mp4_end, mp4_content = mp4_times[i]
+        speaker_mp3_path, mp3_start, mp3_end, _ = mp3_trans_list[i]
+        mp4_duration = mp4_end - mp4_start
+        if mp4_end > mp4.duration:
+            mp4_end = mp4.duration - 0.01
+        mp4_clip = mp4.subclip(mp4_start, mp4_end)
+        if mp4_content and mp4_content != "---":
+            mp3_clip = audio_clip_list[speaker_mp3_path].subclip(
+                mp3_start, float(mp3_end) + 0.1
+            )
+            if ratios[i] > 1:
+                mp4_clip = mp4_clip.speedx(1 / ratios[i])
+            mp4_clip = mp4_clip.set_audio(mp3_clip)
+
+        else:
+            mp4_clip = mp4_clip.speedx(mp4_duration / (mp4_duration + 0.2))
+        mp4_clips.append(mp4_clip)
+        i += 1
+    output_mp4 = f"translated/video/{task.get_file_basename()}.mp4"
+    final_clip = concatenate_videoclips(mp4_clips)
+    final_clip.write_videofile(output_mp4, audio_codec="aac")
+
+    mp4.close()
+    for input_mp3 in audio_file_paths:
+        audio_clip_list[input_mp3].close()
+
+    return output_mp4
 
 
 async def make_voice(text, voice, speed=100):

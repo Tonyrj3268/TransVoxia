@@ -1,9 +1,7 @@
 import traceback
 
-import torch
 import whisperx
-from django.core.files.storage import default_storage
-from moviepy.editor import AudioFileClip, VideoFileClip
+
 from mutagen.mp3 import MP3
 from mutagen.mp4 import MP4
 
@@ -22,26 +20,6 @@ def process_transcript(task: Task) -> None:
         task.save()
     except Exception as e:
         error_message = "Failed to process transcript.\n" + traceback.format_exc()
-        raise Exception(error_message) from e
-
-
-@check_task_status(TaskStatus.VIDEO_MERGE_PROCESSING)
-def process_synthesis(task: Task) -> None:
-    try:
-        audioFilePath = f"{task.get_file_basename()}.mp3"
-        with AudioFileClip(
-            f"translated/audio/{audioFilePath}"
-        ) as audioclip, VideoFileClip(task.fileLocation) as videoclip:
-            newVideoclip = videoclip.set_audio(audioclip)
-            output_path = f"translated/video/{task.get_file_basename()}.mp4"
-            newVideoclip.write_videofile(
-                output_path, codec="libx264", audio_codec="aac"
-            )
-        with open(output_path, "rb") as output_file:
-            default_storage.save(output_path, output_file)
-        newVideoclip.close()
-    except Exception as e:
-        error_message = "Failed to process synthesis.\n" + traceback.format_exc()
         raise Exception(error_message) from e
 
 
@@ -190,18 +168,4 @@ def get_entries(file_path: str):
             "---",
         )
     )
-    file_path = (
-        r"C:\Users\soslab\Desktop\109_projects\TransVoxia\audio-temp/transcript.csv"
-    )
-    import csv
-
-    with open(
-        file_path,
-        "w",
-        newline="",
-        encoding="utf-8",
-    ) as output_file:
-        writer = csv.writer(output_file)
-        for line in formatted_entries_rounded:
-            writer.writerow(line)
     return formatted_entries_rounded, speaker

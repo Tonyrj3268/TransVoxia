@@ -4,3 +4,4 @@ __pycache__/
 .env
 credentials/gcs-service-account-key.json
 trans-voxia-ec34e2def367.json
+static/

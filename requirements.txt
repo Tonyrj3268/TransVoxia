@@ -55,6 +55,7 @@ google-crc32c==1.5.0
 google-resumable-media==2.6.0
 googleapis-common-protos==1.61.0
 greenlet==3.0.0
+h11==0.14.0
 huggingface-hub==0.17.3
 humanfriendly==10.0
 HyperPyYAML==1.2.2
@@ -164,5 +165,6 @@ typing_extensions @ file:///C:/b/abs_213vg2cd1l/croot/typing_extensions_16902978
 tzdata==2023.3
 uritemplate==4.1.1
 urllib3==2.0.6
+uvicorn==0.23.2
 whisperx @ git+https://github.com/m-bain/whisperx.git@66808f6147ffc857c4852c0cae0c0e85ac2d7c94
 yarl==1.9.2

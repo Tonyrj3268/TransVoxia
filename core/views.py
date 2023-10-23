@@ -16,7 +16,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.models import CustomUser
-from audio.models import LanguageMapping, Play_ht_voices
+from audio.models import LanguageMapping
 from video.models import Transcript
 
 from .models import Task, TaskStatus
@@ -26,36 +26,32 @@ from .utils import (
     process_task_notNeedModify,
     process_task_Remaining,
 )
+from asgiref.sync import sync_to_async, async_to_sync
+import asyncio
 
 # Create your views here.
 executor = ThreadPoolExecutor(max_workers=4)
 task_futures: dict[int, ThreadPoolExecutor] = {}
 
 
-def get_dynamic_swagger_params():
-    # 從資料庫取得所有可用的語言和聲音
-    available_languages = LanguageMapping.objects.values_list(
-        "original_language", flat=True
-    )
-    available_voices = Play_ht_voices.objects.values_list("voice", flat=True)
-    target_language_param = openapi.Parameter(
-        name="target_language",
-        in_=openapi.IN_QUERY,
-        type=openapi.TYPE_STRING,
-        description="Target Language",
-        enum=list(available_languages),
-        required=True,
-    )
-    # voice_selection_param = openapi.Parameter(
-    #     name="voice_selection",
-    #     in_=openapi.IN_QUERY,
-    #     type=openapi.TYPE_STRING,
-    #     description="Voice Selection",
-    #     enum=list(available_voices),
-    #     required=True,
-    # )
+# @sync_to_async
+# def get_dynamic_swagger_params():
+#     # 從資料庫取得所有可用的語言和聲音
+#     available_languages = LanguageMapping.objects.values_list(
+#         "original_language", flat=True
+#     )
+#     available_voices = Play_ht_voices.objects.values_list("voice", flat=True)
 
-    return [target_language_param]
+#     # voice_selection_param = openapi.Parameter(
+#     #     name="voice_selection",
+#     #     in_=openapi.IN_QUERY,
+#     #     type=openapi.TYPE_STRING,
+#     #     description="Voice Selection",
+#     #     enum=list(available_voices),
+#     #     required=True,
+#     # )
+
+#     return [target_language_param]
 
 
 class TaskListAPIView(APIView):
@@ -102,6 +98,7 @@ class TaskListAPIView(APIView):
 
         return paginator.get_paginated_response(serializer.data)
 
+    # nOTHING JUST TO REMIND YOU i LEFT sos lab at 9:55
     @swagger_auto_schema(
         operation_description="Create a new task for a specific user.",
         responses={
@@ -110,7 +107,14 @@ class TaskListAPIView(APIView):
         },
         request_body=None,
         manual_parameters=[
-            *get_dynamic_swagger_params(),
+            openapi.Parameter(
+                name="target_language",
+                in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description="Target Language",
+                enum=["DE", "EN", "ES", "FR", "ID", "JA", "KO", "RU", "ZH"],
+                required=True,
+            ),
             openapi.Parameter(
                 name="mode",
                 in_=openapi.IN_QUERY,

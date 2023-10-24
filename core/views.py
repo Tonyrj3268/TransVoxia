@@ -16,18 +16,15 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.models import CustomUser
-from audio.models import LanguageMapping
+from translator.utils import process_deepl
 from video.models import Transcript
 
 from .models import Task, TaskStatus
 from .serializers import TaskSerializer, TaskWithTranscriptSerializer
 from .utils import (
     process_task_NeedModify,
-    process_task_notNeedModify,
     process_task_Remaining,
 )
-from asgiref.sync import sync_to_async, async_to_sync
-import asyncio
 
 # Create your views here.
 executor = ThreadPoolExecutor(max_workers=4)
@@ -175,10 +172,7 @@ class TaskListAPIView(APIView):
                 else:
                     raise Exception("File type not supported")
                 task.save()
-                if task.needModify:
-                    future = executor.submit(process_task_NeedModify, task)
-                else:
-                    future = executor.submit(process_task_notNeedModify, task)
+                future = executor.submit(process_task_NeedModify, task)
 
                 task_futures[task.taskID] = future
                 return Response(
@@ -329,12 +323,24 @@ class ContinueTaskAPIView(APIView):
                 collectionFormat="multi",
                 required=True,
             ),
+            openapi.Parameter(
+                name="fix_which_field",
+                in_=openapi.IN_QUERY,
+                type=openapi.TYPE_STRING,
+                description="Which trnascript to fix? [original_transcript, modified_transcript]",
+                enum=["original_transcript", "modified_transcript", None],
+                required=True,
+            ),
         ],
     )
     def post(self, request, taskID):
         try:
-            data = json.loads(request.body)
+            data = json.loads(request.body.decode("utf-8"))
             new_transcript = data.get("new_transcript", [])
+            which_fix = data.get("fix_which_field", None)
+            if which_fix not in ["original_transcript", "modified_transcript"]:
+                which_fix = None
+
             voice_list = data.get(
                 "voice_list",
                 [
@@ -359,18 +365,37 @@ class ContinueTaskAPIView(APIView):
                 return Response({"msg": "任務不需要編輯，不進行任何操作"}, status=status.HTTP_200_OK)
 
             self.handle_file(task.fileLocation)
+            future = None
+
+            if which_fix == "original_transcript":
+                new_transcript = [
+                    [trans[0], trans[1], trans[2], trans[3]] for trans in new_transcript
+                ]
+                task.transcript.modified_transcript = new_transcript
+                task.transcript.save()
+                process_deepl(task)
+
+            elif which_fix == "modified_transcript":
+                new_transcript = [
+                    [trans[0], trans[1], trans[2], trans[4]] for trans in new_transcript
+                ]
+                task.deepl.translated_text = new_transcript
+                task.deepl.save()
+
             future = executor.submit(
                 process_task_Remaining, task, voice_list=voice_list
             )
+
             task_futures[task.taskID] = future
             return Response({"msg": "任務已開始處理"}, status=status.HTTP_200_OK)
         except Http404:
             return Response({"msg": "找不到指定的任務"}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            return Response(
-                {"msg": f"處理文件時發生錯誤: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+        # except Exception as e:
+        #     print(format_exc())
+        #     return Response(
+        #         {"msg": f"處理文件時發生錯誤: {str(e)}"},
+        #         status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        #     )
 
     @staticmethod
     def handle_file(fileLocation):

@@ -51,20 +51,25 @@ class TaskWithTranscriptSerializer(serializers.ModelSerializer):
         ]
 
     def get_speaker_counts(self, obj):
-        return obj.video.speaker_counts
+        if obj.video:
+            return obj.video.speaker_counts
+        return "計算中..."
 
     def get_transcript(self, obj):
         if not self.should_return_url(obj, TRANSCRIPT_STATUS_MAP):
             return None
         transcript = obj.transcript  # list
         translated_text = obj.deepl.translated_text  # list
+
         if transcript and translated_text:
             if transcript.modified_transcript:
+                for i, trans in enumerate(transcript.modified_transcript):
+                    trans.append(translated_text[i][3])
                 return transcript.modified_transcript
-            for i, trans in enumerate(transcript.transcript):
-                trans.append(translated_text[i][3])
-
-            return transcript.transcript
+            else:
+                for i, trans in enumerate(transcript.transcript):
+                    trans.append(translated_text[i][3])
+                return transcript.transcript
         return None
 
     def get_mp3(self, task):

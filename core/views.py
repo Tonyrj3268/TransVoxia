@@ -313,7 +313,7 @@ class ContinueTaskAPIView(APIView):
                 type=openapi.TYPE_ARRAY,
                 items=openapi.Items(type=openapi.TYPE_STRING),
                 collectionFormat="multi",
-                required=True,
+                required=False,
             ),
             openapi.Parameter(
                 name="voice_list",

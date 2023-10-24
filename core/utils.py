@@ -93,19 +93,23 @@ def process_task_Remaining(task: Task, voice_list: list[str]):
             bumusic_path = os.path.join(
                 bumusic_dir, "mdx_extra", f"{basename}/no_vocals.mp3"
             )
+            file_paths.append(output_path)
             if task.mode == "video":
-                output_path = merge_bgmusic_with_video(task, output_path, bumusic_path)
+                merge_path = merge_bgmusic_with_video(task, output_path, bumusic_path)
             elif task.mode == "audio":
-                output_path = merge_bgmusic_with_audio(task, output_path, bumusic_path)
+                merge_path = merge_bgmusic_with_audio(task, output_path, bumusic_path)
             else:
                 raise Exception("unknown mode")
+            with open(merge_path, "rb") as f:
+                default_storage.save(output_path, f)
+            file_paths.append(merge_path)
+        else:
+            with open(output_path, "rb") as f:
+                default_storage.save(output_path, f)
+            file_paths.append(output_path)
 
         file_paths += csv_list
         file_paths += audio_file_paths
-
-        print(f"開始儲存檔案：{output_path}")
-        with open(output_path, "rb") as f:
-            default_storage.save(output_path, f)
 
         task.status = TaskStatus.TASK_COMPLETED
         task.save()

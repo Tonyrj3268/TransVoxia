@@ -139,7 +139,6 @@ def merge_video(task: Task, audio_file_paths: list[str], csv_list: list[str]) ->
         if task.transcript.modified_transcript
         else task.transcript.transcript
     )
-    origin_transcript = task.transcript.transcript
     video_path = task.fileLocation
     mp4 = VideoFileClip(video_path).without_audio()
     mp4_times = parse_timeline_file(origin_transcript)

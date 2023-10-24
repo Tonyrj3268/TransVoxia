@@ -102,23 +102,25 @@ def merge_bgmusic_with_audio(task: Task, vocal_path: str, bg_music_path: str) ->
 
 @check_task_status(TaskStatus.VOCAL_MERGE_BGMUSIC)
 def merge_bgmusic_with_video(task: Task, video_path: str, bg_music_path: str) -> str:
-    # 讀取你的人聲檔
-    # 讀取你的背景音樂檔
-    with VideoFileClip(video_path) as video, AudioFileClip(
-        bg_music_path
-    ) as background_music:
+    try:
+        # 讀取你的人聲檔
+        # 讀取你的背景音樂檔
+        video = VideoFileClip(video_path)
         vocal = video.audio
-        vocal_duration = vocal.duration
+
+        background_music = AudioFileClip(bg_music_path)
+        video_duration = video.duration
         bg_music_duration = background_music.duration
+
         # 如果背景音樂的持續時間小於視頻的持續時間，則更改背景音樂的速度以匹配視頻的持續時間
-        if bg_music_duration < vocal_duration:
-            speed_factor = vocal_duration / bg_music_duration
+        if bg_music_duration < video_duration:
+            speed_factor = video_duration / bg_music_duration
             background_music = background_music.fl_time(
                 lambda t: t / speed_factor, apply_to=["audio"]
             )
-            background_music = background_music.set_duration(vocal_duration)
+            background_music = background_music.set_duration(video_duration)
         else:
-            min_duration = min(vocal_duration, bg_music_duration)
+            min_duration = min(vocal.duration, bg_music_duration)
             vocal = vocal.subclip(0, min_duration)
             background_music = background_music.subclip(0, min_duration)
 
@@ -126,9 +128,13 @@ def merge_bgmusic_with_video(task: Task, video_path: str, bg_music_path: str) ->
         combined_audio = CompositeAudioClip(
             [vocal.volumex(0.8), background_music.volumex(0.2)]
         )
+
         # 將合成的音頻剪輯寫入新文件
-        video = video.set_audio(combined_audio)
-        video.write_videofile(video_path, audio_codec="aac")
+        video.audio = combined_audio
+        video_path = video_path.replace(".mp4", "_bgmusic.mp4")
+        video.write_videofile(video_path, audio_codec="aac", threads=2)
+    except Exception as e:
+        print(e)
     return video_path
 
 

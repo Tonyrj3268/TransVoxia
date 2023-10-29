@@ -58,9 +58,6 @@ def process_task_NeedModify(task):
 
 
 def process_task_Remaining(task: Task, voice_list: list[str]):
-    import time
-
-    start = time.time()
     print(f"開始處理剩餘任務：{task.taskID}")
     basename = task.get_file_basename()
     file_paths = [
@@ -110,8 +107,6 @@ def process_task_Remaining(task: Task, voice_list: list[str]):
         task.status = TaskStatus.TASK_COMPLETED
         task.save()
         print(f"結束處理任務：{task.taskID}")
-        end = time.time()
-        print(f"花費時間：{end-start}")
 
 
 def process_vocal_task(

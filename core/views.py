@@ -15,7 +15,7 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.models import CustomUser
+from django.contrib.auth.models import User
 from translator.utils import process_deepl
 from video.models import Transcript
 
@@ -80,7 +80,7 @@ class TaskListAPIView(APIView):
     )
     def get(self, request):
         connection.queries.clear()
-        user = CustomUser.objects.get(username="root")
+        user = User.objects.get(username="root")
         transcripts = Transcript.objects.filter(task__user=user)
 
         tasks = (
@@ -154,7 +154,7 @@ class TaskListAPIView(APIView):
                 return Response(
                     {"error": "缺少必要的參數"}, status=status.HTTP_400_BAD_REQUEST
                 )
-            user = CustomUser.objects.get(username="root")
+            user = User.objects.get(username="root")
             task = Task.objects.create(
                 user=user,
                 target_language=target_language,
@@ -234,7 +234,7 @@ class TaskListAPIView(APIView):
         taskID = request.GET.get("taskID")
         field = request.GET.get("field")
         new_value = request.GET.get("new_value")
-        user = CustomUser.objects.get(username="root")
+        user = User.objects.get(username="root")
         if not all([taskID, field, new_value]):
             return Response(
                 {"error": "Missing required fields."},
@@ -270,7 +270,7 @@ class StopTaskAPIView(APIView):
     def post(self, request, taskID):
         try:
             # user = request.user
-            user = CustomUser.objects.get(username="root")
+            user = User.objects.get(username="root")
             task = get_object_or_404(Task, taskID=taskID)
             if user != task.user:
                 return Response({"msg": "無權限操作該任務"}, status=status.HTTP_403_FORBIDDEN)
@@ -350,7 +350,7 @@ class ContinueTaskAPIView(APIView):
                 ],
             )
 
-            user = CustomUser.objects.get(username="root")
+            user = User.objects.get(username="root")
             task = get_object_or_404(Task, taskID=taskID)
             if user != task.user:
                 return Response({"msg": "無權限操作該任務"}, status=status.HTTP_403_FORBIDDEN)

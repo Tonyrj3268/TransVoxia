@@ -102,7 +102,7 @@ def merge_bgmusic_with_audio(task: Task, vocal_path: str, bg_music_path: str) ->
 
 
 @check_task_status(TaskStatus.VOCAL_MERGE_BGMUSIC)
-def merge_bgmusic_with_video(task: Task, video_path: str, bg_music_path: str) -> str:
+def merge_bgmusic_with_video(video_path: str, bg_music_path: str) -> str:
     try:
         # 讀取你的人聲檔
         # 讀取你的背景音樂檔
@@ -136,6 +136,11 @@ def merge_bgmusic_with_video(task: Task, video_path: str, bg_music_path: str) ->
         video.write_videofile(video_path, audio_codec="aac", codec="h264_nvenc")
     except Exception as e:
         print(e)
+    finally:
+        video.close()
+        vocal.close()
+        background_music.close()
+        combined_audio.close()
     return video_path
 
 

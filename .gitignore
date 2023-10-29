@@ -5,3 +5,9 @@ __pycache__/
 credentials/gcs-service-account-key.json
 trans-voxia-ec34e2def367.json
 static/
+*.mp4
+*.mp3
+*.csv
+*.txt
+.venv/
+.mypy_cache/

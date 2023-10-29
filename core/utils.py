@@ -58,6 +58,9 @@ def process_task_NeedModify(task):
 
 
 def process_task_Remaining(task: Task, voice_list: list[str]):
+    import time
+
+    start = time.time()
     print(f"開始處理剩餘任務：{task.taskID}")
     basename = task.get_file_basename()
     file_paths = [
@@ -69,17 +72,14 @@ def process_task_Remaining(task: Task, voice_list: list[str]):
     ]
 
     with handle_task_exceptions(task, file_paths):
-        audio_file_paths = asyncio.run(process_audio(task, voice_list))
-        csv_list = []
         with ThreadPoolExecutor() as executor:
-            for mp3_path, voice in zip(audio_file_paths, voice_list):
-                csv = f"{os.path.splitext(mp3_path)[0]}.csv"
-                csv_list.append(csv)
-                executor.submit(
-                    auditok_detect,
-                    mp3_path,
-                    csv,
-                )
+            future_vocal = executor.submit(process_vocal_task, task, voice_list)
+            if task.needBgmusic:
+                future_bunusic = executor.submit(process_bgmusic_task, task, basename)
+
+            audio_file_paths, csv_list = future_vocal.result()
+            if task.needBgmusic:
+                bumusic_path = future_bunusic.result()
 
         if task.mode == "video":
             output_path = merge_video(task, audio_file_paths, csv_list)
@@ -87,12 +87,8 @@ def process_task_Remaining(task: Task, voice_list: list[str]):
             output_path = merge_audio(task, audio_file_paths, csv_list)
         else:
             raise Exception("unknown mode")
+
         if task.needBgmusic:
-            bumusic_dir = f"translated/bgmusic"
-            split_bg_music(task.fileLocation, output_dir=bumusic_dir)
-            bumusic_path = os.path.join(
-                bumusic_dir, "mdx_extra", f"{basename}/no_vocals.mp3"
-            )
             file_paths.append(output_path)
             if task.mode == "video":
                 merge_path = merge_bgmusic_with_video(task, output_path, bumusic_path)
@@ -114,6 +110,32 @@ def process_task_Remaining(task: Task, voice_list: list[str]):
         task.status = TaskStatus.TASK_COMPLETED
         task.save()
         print(f"結束處理任務：{task.taskID}")
+        end = time.time()
+        print(f"花費時間：{end-start}")
+
+
+def process_vocal_task(
+    task: Task, voice_list: list[str]
+) -> tuple[list[str], list[str]]:
+    audio_file_paths = asyncio.run(process_audio(task, voice_list))
+    csv_list = []
+    with ThreadPoolExecutor() as executor:
+        for mp3_path in audio_file_paths:
+            csv = f"{os.path.splitext(mp3_path)[0]}.csv"
+            csv_list.append(csv)
+            executor.submit(
+                auditok_detect,
+                mp3_path,
+                csv,
+            )
+    return audio_file_paths, csv_list
+
+
+def process_bgmusic_task(task: Task, basename: str) -> str:
+    bumusic_dir = f"translated/bgmusic"
+    split_bg_music(task.fileLocation, output_dir=bumusic_dir)
+    bumusic_path = os.path.join(bumusic_dir, "mdx_extra", f"{basename}/no_vocals.mp3")
+    return bumusic_path
 
 
 def deleteFile(file_paths):

@@ -22,6 +22,7 @@ from core.decorators import check_task_status
 from core.models import Task, TaskStatus
 
 from .models import Play_ht
+import torch
 
 
 @check_task_status(TaskStatus.VOICE_PROCESSING)
@@ -132,7 +133,7 @@ def merge_bgmusic_with_video(task: Task, video_path: str, bg_music_path: str) ->
         # 將合成的音頻剪輯寫入新文件
         video.audio = combined_audio
         video_path = video_path.replace(".mp4", "_bgmusic.mp4")
-        video.write_videofile(video_path, audio_codec="aac", threads=2)
+        video.write_videofile(video_path, audio_codec="aac", codec="h264_nvenc")
     except Exception as e:
         print(e)
     return video_path
@@ -179,7 +180,7 @@ def merge_video(task: Task, audio_file_paths: list[str], csv_list: list[str]) ->
         i += 1
     output_mp4 = f"translated/video/{task.get_file_basename()}.mp4"
     final_clip = concatenate_videoclips(mp4_clips)
-    final_clip.write_videofile(output_mp4, audio_codec="aac")
+    final_clip.write_videofile(output_mp4, audio_codec="aac", codec="h264_nvenc")
 
     mp4.close()
     for input_mp3 in audio_file_paths:
@@ -306,8 +307,12 @@ def get_ssml(transcipts_json):
 
 
 def split_bg_music(origin_mp4, output_dir):
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Split bgmusic using device {device}")
     demucs.separate.main(
         [
+            "--device",
+            device,
             "--mp3",
             "--two-stems",
             "vocals",

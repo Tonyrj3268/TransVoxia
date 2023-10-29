@@ -59,8 +59,13 @@ class TaskWithTranscriptSerializer(serializers.ModelSerializer):
         if not self.should_return_url(obj, TRANSCRIPT_STATUS_MAP):
             return None
         transcript = obj.transcript  # list
-        translated_text = obj.deepl.translated_text  # list
-
+        if obj.deepl:
+            translated_text = obj.deepl.translated_text  # list
+        else:
+            translated_text = [
+                ["", "", "", ""] for _ in range(len(transcript.transcript))
+            ]
+            translated_text[0][3] = "翻譯中..."
         if transcript and translated_text:
             if transcript.modified_transcript:
                 for i, trans in enumerate(transcript.modified_transcript):

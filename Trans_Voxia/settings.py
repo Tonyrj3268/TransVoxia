@@ -72,6 +72,9 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "allauth.account.middleware.AccountMiddleware",
 ]
+CORS_ALLOW_HEADERS = [
+    "ngrok-skip-browser-warning",
+]
 
 CORS_ORIGIN_ALLOW_ALL = True
 

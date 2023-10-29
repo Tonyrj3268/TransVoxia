@@ -102,7 +102,7 @@ def merge_bgmusic_with_audio(task: Task, vocal_path: str, bg_music_path: str) ->
 
 
 @check_task_status(TaskStatus.VOCAL_MERGE_BGMUSIC)
-def merge_bgmusic_with_video(video_path: str, bg_music_path: str) -> str:
+def merge_bgmusic_with_video(task: Task, video_path: str, bg_music_path: str) -> str:
     try:
         # 讀取你的人聲檔
         # 讀取你的背景音樂檔
@@ -152,7 +152,8 @@ def merge_video(task: Task, audio_file_paths: list[str], csv_list: list[str]) ->
         else task.transcript.transcript
     )
     video_path = task.fileLocation
-    mp4 = VideoFileClip(video_path).without_audio()
+    origin = VideoFileClip(video_path)
+    mp4 = origin.without_audio()
     mp4_times = parse_timeline_file(origin_transcript)
 
     audio_clip_list = {}
@@ -187,10 +188,11 @@ def merge_video(task: Task, audio_file_paths: list[str], csv_list: list[str]) ->
     final_clip = concatenate_videoclips(mp4_clips)
     final_clip.write_videofile(output_mp4, audio_codec="aac", codec="h264_nvenc")
 
+    origin.close()
     mp4.close()
     for input_mp3 in audio_file_paths:
         audio_clip_list[input_mp3].close()
-
+    final_clip.close()
     return output_mp4
 
 

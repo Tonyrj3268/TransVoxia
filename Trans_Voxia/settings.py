@@ -113,6 +113,7 @@ DATABASES = {
 # Password validation
 # https://docs.djangoproject.com/en/4.1/ref/settings/#auth-password-validators
 
+AUTH_USER_MODEL = "auth.User"
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
@@ -187,3 +188,5 @@ storage_client = storage.Client()
 GOOGLE_CLOUD_STORAGE_BUCKET = storage_client.get_bucket(
     GOOGLE_CLOUD_STORAGE_BUCKET_NAME
 )
+
+SITE_ID = 1

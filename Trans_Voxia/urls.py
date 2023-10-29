@@ -36,7 +36,6 @@ urlpatterns = [
     path("", include("chatgpt.urls")),
     path("", include("audio.urls")),
     path("", include("dj_rest_auth.urls")),
-    path("accounts/", include("dj_rest_auth.registration.urls")),
     path("admin/", admin.site.urls),
     re_path(
         r"^swagger(?P<format>\.json|\.yaml)$",

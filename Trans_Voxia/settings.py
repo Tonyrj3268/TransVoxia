@@ -49,16 +49,11 @@ INSTALLED_APPS = [
     "drf_yasg",
     "dj_rest_auth",
     "dj_rest_auth.registration",
-    "allauth",
-    "allauth.account",
-    "allauth.socialaccount",
     "core.apps.CoreConfig",
     "video.apps.VideoConfig",
     "translator.apps.TranslatorConfig",
     "audio.apps.AudioConfig",
     "chatgpt.apps.ChatgptConfig",
-    "accounts.apps.AccountsConfig",
-    "subscription.apps.SubscriptionConfig",
 ]
 
 MIDDLEWARE = [
@@ -70,7 +65,6 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "allauth.account.middleware.AccountMiddleware",
 ]
 CORS_ALLOW_HEADERS = [
     "ngrok-skip-browser-warning",
@@ -193,16 +187,3 @@ storage_client = storage.Client()
 GOOGLE_CLOUD_STORAGE_BUCKET = storage_client.get_bucket(
     GOOGLE_CLOUD_STORAGE_BUCKET_NAME
 )
-
-# dj-rest-auth
-AUTH_USER_MODEL = "accounts.CustomUser"
-ACCOUNT_AUTHENTICATION_METHOD = "email_username"
-ACCOUNT_EMAIL_REQUIRED = True
-# ACCOUNT_EMAIL_VERIFICATION = "mandatory"
-SITE_ID = 1
-AUTHENTICATION_BACKENDS = [
-    # allauth specific authentication methods, such as login by e-mail
-    "allauth.account.auth_backends.AuthenticationBackend",
-]
-
-ACCOUNT_EMAIL_VERIFICATION = "none"

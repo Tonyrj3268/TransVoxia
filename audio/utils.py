@@ -218,6 +218,7 @@ async def make_voice(text, voice, speed=100):
         async with session.post(
             "https://play.ht/api/v1/convert/", json=json.loads(payload), headers=headers
         ) as response:
+            print(response)
             res_json = await response.json()
             id = res_json["transcriptionId"]
             url = "https://play.ht/api/v1/articleStatus?transcriptionId=" + id
@@ -315,7 +316,6 @@ def get_ssml(transcipts_json):
 
 def split_bg_music(origin_mp4, output_dir):
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Split bgmusic using device {device}")
     demucs.separate.main(
         [
             "--device",

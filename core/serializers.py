@@ -83,6 +83,8 @@ class TaskWithTranscriptSerializer(serializers.ModelSerializer):
     def get_mp3(self, task):
         if not self.should_return_url(task, MP3_STATUS_MAP):
             return None
+        if task.mode in ["video"]:
+            return None
         fileName = task.get_file_basename()
         if task.mode in ["video", "audio"]:
             file_path = "translated/audio/" + fileName + ".mp3"
@@ -91,6 +93,8 @@ class TaskWithTranscriptSerializer(serializers.ModelSerializer):
 
     def get_mp4(self, task):
         if not self.should_return_url(task, MP4_STATUS_MAP):
+            return None
+        if task.mode in ["audio"]:
             return None
         fileName = task.get_file_basename()
         if task.mode == "video":

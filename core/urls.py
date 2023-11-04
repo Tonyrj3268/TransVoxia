@@ -3,7 +3,12 @@ from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
 from rest_framework import permissions
 
-from .views import ContinueTaskAPIView, StopTaskAPIView, TaskListAPIView
+from .views import (
+    ContinueTaskAPIView,
+    StopTaskAPIView,
+    TaskListAPIView,
+    GetIncompleteAPIView,
+)
 
 schema_view = get_schema_view(
     openapi.Info(
@@ -25,4 +30,5 @@ urlpatterns = [
     path("tasks/", TaskListAPIView.as_view(), name="task-list"),
     path("stop_task/<str:taskID>/", StopTaskAPIView.as_view()),
     path("continue_task/<str:taskID>/", ContinueTaskAPIView.as_view()),
+    path("get_incomplete/<str:taskID>/", GetIncompleteAPIView.as_view()),
 ]

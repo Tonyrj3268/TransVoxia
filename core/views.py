@@ -51,6 +51,23 @@ task_futures: dict[int, ThreadPoolExecutor] = {}
 #     return [target_language_param]
 
 
+class GetIncompleteAPIView(APIView):
+    def get(self, request, taskID):
+        user = User.objects.get(username="root")
+        transcripts = Transcript.objects.filter(task__user=user)
+        tasks = (
+            Task.objects.filter(user=user, id__gt=taskID)
+            .order_by("-request_time")
+            .prefetch_related(Prefetch("transcript", queryset=transcripts))
+        )
+        paginator = self.CustomPagination()
+        result_page = paginator.paginate_queryset(tasks, request)
+
+        serializer = TaskWithTranscriptSerializer(result_page, many=True)
+
+        return paginator.get_paginated_response(serializer.data)
+
+
 class TaskListAPIView(APIView):
     parser_classes = (MultiPartParser,)
 

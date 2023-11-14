@@ -208,11 +208,7 @@ async def make_voice(text, voice, speed=100):
             "globalSpeed": str(speed) + "%",
         }
     )
-    headers = {
-        "accept": "application/json",
-        "AUTHORIZATION": "6d1275331bc1403ebd28045f7b8d9f5e",
-        "X-USER-ID": "9X30i7n3LMTk9OyzeTvSGxG9snO2",
-    }
+    headers = json.loads(os.getenv("PLAY_HT_API_KEY"))
 
     async with aiohttp.ClientSession() as session:
         async with session.post(

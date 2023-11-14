@@ -9,6 +9,10 @@ from core.decorators import check_task_status
 from core.models import Task, TaskStatus
 
 from .models import Transcript, Video
+<<<<<<< HEAD
+=======
+import os
+>>>>>>> 6045e017cbeb1e9b23a0fc04e2bc7b2634989758
 
 
 @check_task_status(TaskStatus.TRANSCRIPT_PROCESSING)
@@ -74,8 +78,9 @@ def get_transcript(file_path: str) -> list:
         device,
         return_char_alignments=False,
     )
+    hugging_face_token = os.getenv("HUGGING_FACE_TOKEN", None)
     diarize_model = whisperx.DiarizationPipeline(
-        use_auth_token="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", device=device
+        use_auth_token=hugging_face_token, device=device
     )
     diarize_segments = diarize_model(audio)
 

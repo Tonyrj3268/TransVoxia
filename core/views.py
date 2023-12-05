@@ -112,7 +112,6 @@ class TaskListAPIView(APIView):
 
         return paginator.get_paginated_response(serializer.data)
 
-    # nOTHING JUST TO REMIND YOU i LEFT sos lab at 9:55
     @swagger_auto_schema(
         operation_description="Create a new task for a specific user.",
         responses={
@@ -126,7 +125,7 @@ class TaskListAPIView(APIView):
                 in_=openapi.IN_QUERY,
                 type=openapi.TYPE_STRING,
                 description="Target Language",
-                enum=["DE", "EN", "ES", "FR", "ID", "JA", "KO", "RU", "ZH"],
+                enum=["DE", "EN-US", "ES", "FR", "ID", "JA", "KO", "RU", "ZH"],
                 required=True,
             ),
             openapi.Parameter(
@@ -246,7 +245,6 @@ class TaskListAPIView(APIView):
             ),
         ],
     )
-    # @permission_classes([IsAuthenticated])
     def put(self, request):
         taskID = request.GET.get("taskID")
         field = request.GET.get("field")
@@ -283,7 +281,6 @@ class StopTaskAPIView(APIView):
             500: "Internal Server Error",
         },
     )
-    # @permission_classes([IsAuthenticated])
     def post(self, request, taskID):
         try:
             # user = request.user

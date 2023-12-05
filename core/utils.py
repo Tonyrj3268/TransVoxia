@@ -53,6 +53,11 @@ def process_task_NeedModify(task):
     with handle_task_exceptions(task, file_paths):
         process_transcript(task)
         process_deepl(task)
+    if (
+        task.status == TaskStatus.TASK_FAILED
+        or task.status == TaskStatus.TASK_CANCELLED
+    ):
+        return
     task.status = TaskStatus.TASK_STOPPED
     task.save()
 
@@ -155,7 +160,7 @@ def handle_task_exceptions(task, file_paths):
         task.status = TaskStatus.TASK_CANCELLED
         task.save()
         print(f"任务取消：{task.taskID}")
-    except Exception as e:
+    except Exception:
         task.status = TaskStatus.TASK_FAILED
         task.save()
         print(f"强制结束任务：{task.taskID}")

@@ -9,10 +9,7 @@ from core.decorators import check_task_status
 from core.models import Task, TaskStatus
 
 from .models import Transcript, Video
-<<<<<<< HEAD
-=======
 import os
->>>>>>> 6045e017cbeb1e9b23a0fc04e2bc7b2634989758
 
 
 @check_task_status(TaskStatus.TRANSCRIPT_PROCESSING)
@@ -60,10 +57,10 @@ def format_time(time):
 
 def get_transcript(file_path: str) -> list:
     device = "cuda"
-    batch_size = 16  # reduce if low on GPU mem
+    batch_size = 8  # reduce if low on GPU mem
     compute_type = "float16"  # change to "int8" if low on GPU mem (may reduce accuracy)
 
-    model = whisperx.load_model("large-v2", device, compute_type=compute_type)
+    model = whisperx.load_model("large-v3", device, compute_type=compute_type)
     audio = whisperx.load_audio(file_path)
     result = model.transcribe(audio, batch_size=batch_size)
     model_a, metadata = whisperx.load_align_model(
@@ -80,7 +77,9 @@ def get_transcript(file_path: str) -> list:
     )
     hugging_face_token = os.getenv("HUGGING_FACE_TOKEN", None)
     diarize_model = whisperx.DiarizationPipeline(
-        use_auth_token=hugging_face_token, device=device
+        model_name="pyannote/speaker-diarization-3.1",
+        use_auth_token=hugging_face_token,
+        device=device,
     )
     diarize_segments = diarize_model(audio)
 
@@ -92,6 +91,8 @@ def get_entries(file_path: str):
     entries = []
     speaker = set()
     time_stamp_transcript = get_transcript(file_path)
+    with open("write.txt", "w", encoding="utf-8") as f:
+        f.write(str(time_stamp_transcript))
     for segment in time_stamp_transcript:
         for j, word in enumerate(segment["words"]):
             try:
@@ -108,7 +109,6 @@ def get_entries(file_path: str):
                 #     entries[-1]["word"] += "."
             except Exception as e:
                 print(e)
-                pass
 
     combined_entries = []
     current_entry = None

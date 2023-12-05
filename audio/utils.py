@@ -169,6 +169,8 @@ def merge_video(task: Task, audio_file_paths: list[str], csv_list: list[str]) ->
         _, mp4_start, mp4_end, mp4_content = mp4_times[i]
         speaker_mp3_path, mp3_start, mp3_end, _ = mp3_trans_list[i]
         mp4_duration = mp4_end - mp4_start
+        if mp4_start > mp4.duration:
+            break
         if mp4_end > mp4.duration:
             mp4_end = mp4.duration - 0.01
         mp4_clip = mp4.subclip(mp4_start, mp4_end)

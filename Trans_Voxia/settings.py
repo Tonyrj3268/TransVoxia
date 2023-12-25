@@ -29,9 +29,14 @@ load_dotenv()
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = ["127.0.0.1", "localhost", ".ngrok-free.app"]
+ALLOWED_HOSTS = [
+    "127.0.0.1",
+    "localhost",
+    ".ngrok-free.app",
+    "transvoxia.ngrok.io",
+]
 
 # Application definition
 
@@ -185,3 +190,7 @@ GOOGLE_CLOUD_STORAGE_BUCKET = storage_client.get_bucket(
 )
 
 SITE_ID = 1
+
+import logging
+
+logging.basicConfig(level=logging.INFO, filename="memory_usage.log")

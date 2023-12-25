@@ -20,6 +20,7 @@ from video.utils import process_transcript
 from .decorators import TaskCancelledException
 from .models import Task, TaskStatus
 from django.core.files.storage import default_storage
+import gc
 
 
 def process_task_notNeedModify(task):
@@ -44,7 +45,7 @@ def process_task_notNeedModify(task):
     # print(f"結束處理任務：{task.taskID}")
 
 
-def process_task_NeedModify(task):
+def process_task_NeedModify(task, task_futures: dict):
     print(f"任務開始：{task.taskID}")
     file_paths = [
         task.fileLocation,
@@ -60,6 +61,8 @@ def process_task_NeedModify(task):
         return
     task.status = TaskStatus.TASK_STOPPED
     task.save()
+    del task_futures[task.taskID]
+    gc.collect()
 
 
 def process_task_Remaining(task: Task, voice_list: list[str]):

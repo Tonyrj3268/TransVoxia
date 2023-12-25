@@ -20,7 +20,7 @@ def check_task_status(status):  # 这里的status就是你想传入的参数
 
             task.refresh_from_db()
             if task.status == TaskStatus.TASK_CANCELLED:
-                raise TaskCancelledException("任务已被取消")
+                raise TaskCancelledException("任務已被取消")
 
             return result
 

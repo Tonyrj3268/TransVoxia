@@ -10,6 +10,8 @@ from core.models import Task, TaskStatus
 
 from .models import Transcript, Video
 import os
+import gc
+import torch
 
 
 @check_task_status(TaskStatus.TRANSCRIPT_PROCESSING)
@@ -55,14 +57,20 @@ def format_time(time):
     return "{:.2f}".format(time)
 
 
+def transcribe(device, audio, batch_size, compute_type):
+    model = whisperx.load_model("large-v2", device, compute_type=compute_type)
+    result = model.transcribe(audio, batch_size=batch_size)
+    del model
+    return result
+
+
 def get_transcript(file_path: str) -> list:
     device = "cuda"
-    batch_size = 8  # reduce if low on GPU mem
+    batch_size = 16  # reduce if low on GPU mem
     compute_type = "float16"  # change to "int8" if low on GPU mem (may reduce accuracy)
-
-    model = whisperx.load_model("large-v3", device, compute_type=compute_type)
     audio = whisperx.load_audio(file_path)
-    result = model.transcribe(audio, batch_size=batch_size)
+    result = transcribe(device, audio, batch_size, compute_type)
+
     model_a, metadata = whisperx.load_align_model(
         language_code=result["language"], device=device
     )
@@ -77,13 +85,16 @@ def get_transcript(file_path: str) -> list:
     )
     hugging_face_token = os.getenv("HUGGING_FACE_TOKEN", None)
     diarize_model = whisperx.DiarizationPipeline(
-        model_name="pyannote/speaker-diarization-3.1",
+        model_name="pyannote/speaker-diarization@2.1",
         use_auth_token=hugging_face_token,
         device=device,
     )
     diarize_segments = diarize_model(audio)
 
     result = whisperx.assign_word_speakers(diarize_segments, result)
+
+    torch.cuda.empty_cache()
+    gc.collect()
     return result["segments"]
 
 
@@ -105,8 +116,10 @@ def get_entries(file_path: str):
                     }
                 )
                 speaker.add(segment["speaker"])
-                # if j == len(segment["words"])-1 and not ends_with_punctuation(word["word"]):
-                #     entries[-1]["word"] += "."
+                if j == len(segment["words"]) - 1 and not ends_with_punctuation(
+                    word["word"]
+                ):
+                    entries[-1]["word"] += "."
             except Exception as e:
                 print(e)
 
@@ -135,6 +148,7 @@ def get_entries(file_path: str):
             current_text = ""
     output_entries = []
     current_entry = None
+
     if combined_entries[0]["start"] > 0:
         output_entries.append(
             {

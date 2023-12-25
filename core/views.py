@@ -25,6 +25,7 @@ from .utils import (
     process_task_NeedModify,
     process_task_Remaining,
 )
+import gc
 
 # Create your views here.
 executor = ThreadPoolExecutor(max_workers=4)
@@ -188,8 +189,7 @@ class TaskListAPIView(APIView):
                 else:
                     raise Exception("File type not supported")
                 task.save()
-                future = executor.submit(process_task_NeedModify, task)
-
+                future = executor.submit(process_task_NeedModify, task, task_futures)
                 task_futures[task.taskID] = future
                 return Response(
                     {"msg": "已收到 任務ID: " + str(task.taskID)}, status=status.HTTP_200_OK
@@ -399,7 +399,6 @@ class ContinueTaskAPIView(APIView):
             future = executor.submit(
                 process_task_Remaining, task, voice_list=voice_list
             )
-
             task_futures[task.taskID] = future
             return Response({"msg": "任務已開始處理"}, status=status.HTTP_200_OK)
         except Http404:
